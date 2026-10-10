@@ -28,6 +28,8 @@ export const AddMeterView: React.FC = () => {
   } = useWattWise();
 
   const [serialNumber, setSerialNumber] = useState('');
+  const [meterNumber, setMeterNumber] = useState('');
+  const [consumerId, setConsumerId] = useState('');
   const [referenceNumber, setReferenceNumber] = useState('');
   const [ownerName, setOwnerName] = useState(userProfile?.name || '');
   const [location, setLocation] = useState('');
@@ -45,7 +47,17 @@ export const AddMeterView: React.FC = () => {
   useEffect(() => {
     if (editingMeter) {
       setSerialNumber(editingMeter.meterName);
-      setReferenceNumber(editingMeter.meterNumber === 'N/A' ? '' : editingMeter.meterNumber);
+      setMeterNumber(editingMeter.meterNumber === 'N/A' ? '' : editingMeter.meterNumber);
+      setConsumerId(
+        !editingMeter.consumerId || editingMeter.consumerId === 'N/A'
+          ? ''
+          : editingMeter.consumerId
+      );
+      setReferenceNumber(
+        !editingMeter.referenceNumber || editingMeter.referenceNumber === 'N/A'
+          ? ''
+          : editingMeter.referenceNumber
+      );
       setOwnerName(editingMeter.ownerName || userProfile?.name || '');
       setLocation(editingMeter.location);
       setProvider(editingMeter.provider);
@@ -56,6 +68,8 @@ export const AddMeterView: React.FC = () => {
       setInitialReading(String(editingMeter.openingReading));
     } else {
       setSerialNumber('');
+      setMeterNumber('');
+      setConsumerId('');
       setReferenceNumber('');
       setOwnerName(userProfile?.name || '');
       setLocation('');
@@ -89,12 +103,16 @@ export const AddMeterView: React.FC = () => {
 
     setIsSaving(true);
     try {
+      const cleanMeterNo = meterNumber.trim() || referenceNumber.trim() || 'N/A';
+      const cleanConsumerId = consumerId.trim() || 'N/A';
       const cleanRef = referenceNumber.trim() || 'N/A';
       const cleanOwner = ownerName.trim() || userProfile?.name || 'User';
       if (editingMeter) {
         await updateMeter(editingMeter.meterId, {
           meterName: serialNumber.trim(),
-          meterNumber: cleanRef,
+          meterNumber: cleanMeterNo,
+          consumerId: cleanConsumerId,
+          referenceNumber: cleanRef,
           ownerName: cleanOwner,
           location,
           provider,
@@ -107,7 +125,9 @@ export const AddMeterView: React.FC = () => {
       } else {
         await addMeter({
           meterName: serialNumber.trim(),
-          meterNumber: cleanRef,
+          meterNumber: cleanMeterNo,
+          consumerId: cleanConsumerId,
+          referenceNumber: cleanRef,
           ownerName: cleanOwner,
           location,
           provider,
@@ -134,8 +154,8 @@ export const AddMeterView: React.FC = () => {
         </h1>
         <p className="text-sm text-slate-500 mt-0.5">
           {editingMeter
-            ? 'Update meter serial number, reference number, owner name, monthly unit limit, and tariff'
-            : 'Register a new electricity meter with its serial number, reference number, and owner name'}
+            ? 'Update meter serial number, meter number, consumer ID, reference number, owner name, and tariff'
+            : 'Register a new electricity meter with its serial number, meter number, consumer ID, reference number, and owner name'}
         </p>
       </div>
 
@@ -159,6 +179,36 @@ export const AddMeterView: React.FC = () => {
                 value={serialNumber}
                 onChange={(e) => setSerialNumber(e.target.value)}
                 placeholder="Enter meter serial number (e.g. SN-409281)"
+                required
+                className="w-full px-3.5 py-2.5 text-sm rounded-lg border border-slate-300 focus:border-[#1D63ED] outline-none font-mono"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                Meter Number *
+              </label>
+              <input
+                type="text"
+                value={meterNumber}
+                onChange={(e) => setMeterNumber(e.target.value)}
+                placeholder="Enter meter number (e.g. MTR-883920)"
+                required
+                className="w-full px-3.5 py-2.5 text-sm rounded-lg border border-slate-300 focus:border-[#1D63ED] outline-none font-mono"
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                Consumer ID *
+              </label>
+              <input
+                type="text"
+                value={consumerId}
+                onChange={(e) => setConsumerId(e.target.value)}
+                placeholder="Enter consumer ID (e.g. CID-1029384)"
                 required
                 className="w-full px-3.5 py-2.5 text-sm rounded-lg border border-slate-300 focus:border-[#1D63ED] outline-none font-mono"
               />
@@ -329,16 +379,19 @@ export const AddMeterView: React.FC = () => {
 
           <div className="space-y-2.5 text-xs text-slate-600 leading-relaxed">
             <p>
-              <strong>Serial Number:</strong> The physical identification number printed on your electricity meter.
+              <strong>Serial Number:</strong> The physical serial identification printed on your electricity meter.
             </p>
             <p>
-              <strong>Reference Number:</strong> Your utility provider account or consumer reference number for billing.
+              <strong>Meter Number:</strong> The official meter number assigned to this electricity meter.
+            </p>
+            <p>
+              <strong>Consumer ID:</strong> Your unique consumer ID issued by your electricity provider.
+            </p>
+            <p>
+              <strong>Reference Number:</strong> Your utility billing reference number on your monthly bill.
             </p>
             <p>
               <strong>Owner Name:</strong> The registered owner or consumer name for this meter.
-            </p>
-            <p>
-              <strong>Opening Reading:</strong> The meter reading value at the start of the billing period.
             </p>
           </div>
         </div>

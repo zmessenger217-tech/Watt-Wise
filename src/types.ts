@@ -51,6 +51,8 @@ export interface ElectricityMeter {
   userId: string;
   meterName: string;
   meterNumber: string;
+  consumerId?: string;
+  referenceNumber?: string;
   ownerName: string;
   location: string;
   provider: string;

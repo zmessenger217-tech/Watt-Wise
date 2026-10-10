@@ -570,7 +570,10 @@ export const DashboardView: React.FC = () => {
                             SN: {meter.meterName}
                           </h3>
                           <p className="text-xs text-slate-500 font-mono truncate">
-                            Ref: {meter.meterNumber}
+                            Mtr: {meter.meterNumber} · CID: {meter.consumerId || 'N/A'}
+                          </p>
+                          <p className="text-[11px] text-slate-400 truncate">
+                            Owner: {meter.ownerName || 'User'}
                           </p>
                         </div>
                       </div>

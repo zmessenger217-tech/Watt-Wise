@@ -47,6 +47,9 @@ export const MyMetersView: React.FC = () => {
       const matchesSearch =
         m.meterName.toLowerCase().includes(searchQuery.toLowerCase()) ||
         m.meterNumber.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (m.consumerId || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (m.referenceNumber || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (m.ownerName || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
         m.location.toLowerCase().includes(searchQuery.toLowerCase()) ||
         m.provider.toLowerCase().includes(searchQuery.toLowerCase());
 
@@ -181,8 +184,20 @@ export const MyMetersView: React.FC = () => {
                         {meter.isArchived ? 'Archived' : thresholdInfo.statusLabel}
                       </span>
                     </div>
-                    <div className="text-xs font-mono text-slate-500 mt-0.5">
-                      Ref No: {meter.meterNumber} · Owner: {meter.ownerName || 'User'} · {meter.provider}
+                    <div className="text-xs font-mono text-slate-500 mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5">
+                      <span>Meter No: {meter.meterNumber}</span>
+                      <span>·</span>
+                      <span>Consumer ID: {meter.consumerId || 'N/A'}</span>
+                      {meter.referenceNumber && meter.referenceNumber !== 'N/A' && (
+                        <>
+                          <span>·</span>
+                          <span>Ref: {meter.referenceNumber}</span>
+                        </>
+                      )}
+                      <span>·</span>
+                      <span>Owner: {meter.ownerName || 'User'}</span>
+                      <span>·</span>
+                      <span>{meter.provider}</span>
                     </div>
                     {meter.location && (
                       <div className="flex items-center gap-1.5 text-xs text-slate-500 mt-2">
@@ -294,10 +309,15 @@ export const MyMetersView: React.FC = () => {
                 <MeterIconBadge iconType={detailMeter.iconType} size="md" />
                 <div>
                   <h3 className="text-lg font-bold text-slate-900">
-                    {detailMeter.meterName} ({detailMeter.meterNumber})
+                    Serial: {detailMeter.meterName} (Meter No: {detailMeter.meterNumber})
                   </h3>
                   <p className="text-xs text-slate-500">
-                    {detailMeter.provider} · Owner: {detailMeter.ownerName || 'User'} · {detailMeter.location || 'Primary Location'}
+                    Consumer ID: {detailMeter.consumerId || 'N/A'}
+                    {detailMeter.referenceNumber && detailMeter.referenceNumber !== 'N/A'
+                      ? ` · Ref: ${detailMeter.referenceNumber}`
+                      : ''}{' '}
+                    · Owner: {detailMeter.ownerName || 'User'} · {detailMeter.provider} ·{' '}
+                    {detailMeter.location || 'Primary Location'}
                   </p>
                 </div>
               </div>

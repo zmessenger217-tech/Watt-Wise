@@ -7,6 +7,8 @@ export const SetupWizardModal: React.FC = () => {
   const { showSetupWizard, setShowSetupWizard, addMeter, userProfile } = useWattWise();
 
   const [serialNumber, setSerialNumber] = useState('');
+  const [meterNumber, setMeterNumber] = useState('');
+  const [consumerId, setConsumerId] = useState('');
   const [referenceNumber, setReferenceNumber] = useState('');
   const [ownerName, setOwnerName] = useState(userProfile?.name || '');
   const [location, setLocation] = useState('');
@@ -26,7 +28,9 @@ export const SetupWizardModal: React.FC = () => {
     try {
       await addMeter({
         meterName: serialNumber.trim(),
-        meterNumber: referenceNumber.trim() || 'N/A',
+        meterNumber: meterNumber.trim() || referenceNumber.trim() || 'N/A',
+        consumerId: consumerId.trim() || 'N/A',
+        referenceNumber: referenceNumber.trim() || 'N/A',
         ownerName: ownerName.trim() || userProfile?.name || 'User',
         location: location.trim(),
         provider: provider.trim() || 'LESCO',
@@ -68,7 +72,7 @@ export const SetupWizardModal: React.FC = () => {
         <div className="p-6 space-y-5">
           <form onSubmit={handleCreateFirstMeter} className="space-y-4">
             <div className="text-xs font-semibold text-slate-500">
-              Enter your meter serial number, reference number, and owner name to start tracking:
+              Enter your meter serial number, meter number, consumer ID, reference number, and owner name:
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
@@ -81,6 +85,35 @@ export const SetupWizardModal: React.FC = () => {
                   value={serialNumber}
                   onChange={(e) => setSerialNumber(e.target.value)}
                   placeholder="e.g. SN-409281"
+                  required
+                  className="w-full px-3 py-2 text-sm rounded-lg border border-slate-300 focus:border-[#1D63ED] outline-none font-mono"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  Meter Number *
+                </label>
+                <input
+                  type="text"
+                  value={meterNumber}
+                  onChange={(e) => setMeterNumber(e.target.value)}
+                  placeholder="e.g. MTR-883920"
+                  required
+                  className="w-full px-3 py-2 text-sm rounded-lg border border-slate-300 focus:border-[#1D63ED] outline-none font-mono"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  Consumer ID *
+                </label>
+                <input
+                  type="text"
+                  value={consumerId}
+                  onChange={(e) => setConsumerId(e.target.value)}
+                  placeholder="e.g. CID-1029384"
                   required
                   className="w-full px-3 py-2 text-sm rounded-lg border border-slate-300 focus:border-[#1D63ED] outline-none font-mono"
                 />
