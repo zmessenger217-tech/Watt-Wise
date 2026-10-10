@@ -51,6 +51,7 @@ export interface ElectricityMeter {
   userId: string;
   meterName: string;
   meterNumber: string;
+  ownerName: string;
   location: string;
   provider: string;
   iconType: MeterIconType;

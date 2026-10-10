@@ -85,7 +85,7 @@ service cloud.firestore {
 
     function isValidElectricityMeter(data, userId, meterId) {
       return data.keys().hasAll([
-        'meterId', 'userId', 'meterName', 'meterNumber', 'location', 'provider',
+        'meterId', 'userId', 'meterName', 'meterNumber', 'ownerName', 'location', 'provider',
         'iconType', 'monthlyLimit', 'estimatedRate', 'fixedCharges', 'additionalCharges',
         'taxPercentage', 'currentMonthId', 'openingReading', 'previousReading',
         'previousReadingDate', 'currentReading', 'lastReadingDate', 'unitsConsumed',
@@ -93,7 +93,7 @@ service cloud.firestore {
         'isActive', 'isArchived', 'createdAt', 'updatedAt'
       ]) &&
       data.keys().hasOnly([
-        'meterId', 'userId', 'meterName', 'meterNumber', 'location', 'provider',
+        'meterId', 'userId', 'meterName', 'meterNumber', 'ownerName', 'location', 'provider',
         'iconType', 'monthlyLimit', 'estimatedRate', 'fixedCharges', 'additionalCharges',
         'taxPercentage', 'currentMonthId', 'openingReading', 'previousReading',
         'previousReadingDate', 'currentReading', 'lastReadingDate', 'unitsConsumed',
@@ -106,6 +106,7 @@ service cloud.firestore {
       data.userId.matches('^[a-zA-Z0-9_\\-]+$') && data.userId == userId && data.userId == request.auth.uid &&
       data.meterName is string && data.meterName.size() >= 1 && data.meterName.size() <= 80 &&
       data.meterNumber is string && data.meterNumber.size() >= 1 && data.meterNumber.size() <= 60 &&
+      data.ownerName is string && data.ownerName.size() <= 100 &&
       data.location is string && data.location.size() <= 160 &&
       data.provider is string && data.provider.size() >= 1 && data.provider.size() <= 80 &&
       data.iconType is string && data.iconType.size() >= 1 && data.iconType.size() <= 20 &&

@@ -182,7 +182,7 @@ export const MyMetersView: React.FC = () => {
                       </span>
                     </div>
                     <div className="text-xs font-mono text-slate-500 mt-0.5">
-                      Ref No: {meter.meterNumber} · {meter.provider}
+                      Ref No: {meter.meterNumber} · Owner: {meter.ownerName || 'User'} · {meter.provider}
                     </div>
                     {meter.location && (
                       <div className="flex items-center gap-1.5 text-xs text-slate-500 mt-2">
@@ -297,7 +297,7 @@ export const MyMetersView: React.FC = () => {
                     {detailMeter.meterName} ({detailMeter.meterNumber})
                   </h3>
                   <p className="text-xs text-slate-500">
-                    {detailMeter.provider} · {detailMeter.location || 'Primary Location'}
+                    {detailMeter.provider} · Owner: {detailMeter.ownerName || 'User'} · {detailMeter.location || 'Primary Location'}
                   </p>
                 </div>
               </div>

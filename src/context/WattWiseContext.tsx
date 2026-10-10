@@ -503,43 +503,53 @@ export const WattWiseProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     [clearFirestoreListeners, purgeFirestoreUserCollections]
   );
 
-  // Check active session on mount
+  // Check active session on mount & listen to Firebase Auth state across devices
   useEffect(() => {
-    const savedSessionRaw = localStorage.getItem(LOCAL_SESSION_KEY);
-    if (savedSessionRaw) {
-      try {
-        const savedSession = JSON.parse(savedSessionRaw) as {
-          userId: string;
-          name: string;
-          email: string;
-        };
-        // Verify that the account still exists in the registered accounts list
-        const rawAccounts = localStorage.getItem(LOCAL_ACCOUNTS_KEY);
-        const accounts: LocalAccountRecord[] = rawAccounts ? JSON.parse(rawAccounts) : [];
-        const matchedAccount = accounts.find((a) => a.userId === savedSession.userId);
-        if (matchedAccount) {
-          setIsAuthenticated(true);
-          setIsFirestoreBacked(false);
-          loadLocalWorkspace(matchedAccount.userId, matchedAccount.name, matchedAccount.email);
-          setIsAuthReady(true);
-          return;
-        } else {
-          localStorage.removeItem(LOCAL_SESSION_KEY);
+    const unsubscribe = onAuthStateChanged(auth, async (fbUser) => {
+      if (fbUser) {
+        setIsAuthenticated(true);
+        setIsFirestoreBacked(true);
+        await setupFirestoreWorkspace(fbUser);
+        setIsAuthReady(true);
+      } else {
+        // Fallback to local session if no Firebase Auth user
+        const savedSessionRaw = localStorage.getItem(LOCAL_SESSION_KEY);
+        if (savedSessionRaw) {
+          try {
+            const savedSession = JSON.parse(savedSessionRaw) as {
+              userId: string;
+              name: string;
+              email: string;
+            };
+            const rawAccounts = localStorage.getItem(LOCAL_ACCOUNTS_KEY);
+            const accounts: LocalAccountRecord[] = rawAccounts ? JSON.parse(rawAccounts) : [];
+            const matchedAccount = accounts.find((a) => a.userId === savedSession.userId);
+            if (matchedAccount) {
+              setIsAuthenticated(true);
+              setIsFirestoreBacked(false);
+              loadLocalWorkspace(matchedAccount.userId, matchedAccount.name, matchedAccount.email);
+              setIsAuthReady(true);
+              return;
+            } else {
+              localStorage.removeItem(LOCAL_SESSION_KEY);
+            }
+          } catch {
+            localStorage.removeItem(LOCAL_SESSION_KEY);
+          }
         }
-      } catch {
-        localStorage.removeItem(LOCAL_SESSION_KEY);
-      }
-    }
 
-    setIsAuthenticated(false);
-    setIsFirestoreBacked(false);
-    setUserProfile(null);
-    setIsAuthReady(true);
+        setIsAuthenticated(false);
+        setIsFirestoreBacked(false);
+        setUserProfile(null);
+        setIsAuthReady(true);
+      }
+    });
 
     return () => {
+      unsubscribe();
       clearFirestoreListeners();
     };
-  }, [loadLocalWorkspace, clearFirestoreListeners]);
+  }, [loadLocalWorkspace, setupFirestoreWorkspace, clearFirestoreListeners]);
 
   // Helper to dispatch a new notification (in-app + device notification bar)
   const createNotificationInternal = useCallback(
@@ -685,54 +695,55 @@ export const WattWiseProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         throw new Error('Please enter your password.');
       }
 
-      const rawAccounts = localStorage.getItem(LOCAL_ACCOUNTS_KEY);
-      const accounts: LocalAccountRecord[] = rawAccounts ? JSON.parse(rawAccounts) : [];
-      let found = accounts.find((a) => a.email.toLowerCase() === cleanEmail);
-
-      // If not in local accounts, try Firebase Auth sign in
-      if (!found) {
-        try {
-          const cred = await signInWithEmailAndPassword(auth, cleanEmail, password);
-          if (cred.user) {
-            const userId = sanitizeId(`user-${cred.user.uid}`);
-            const userName = cred.user.displayName || cleanEmail.split('@')[0];
-            found = {
-              userId,
-              name: userName,
-              email: cleanEmail,
-              passwordHash: password,
-            };
-            const updated = [...accounts.filter(a => a.email.toLowerCase() !== cleanEmail), found];
-            localStorage.setItem(LOCAL_ACCOUNTS_KEY, JSON.stringify(updated));
-            setIsFirestoreBacked(true);
-          }
-        } catch {
-          // ignore firebase auth error and fall through to error message below
+      try {
+        // Try Firebase Auth first for cross-device login
+        const cred = await signInWithEmailAndPassword(auth, cleanEmail, password);
+        if (cred.user) {
+          localStorage.removeItem(LOCAL_SESSION_KEY);
+          setIsAuthenticated(true);
+          setIsFirestoreBacked(true);
+          await setupFirestoreWorkspace(cred.user);
+          addToast('Welcome back!', `Signed in as ${cred.user.displayName || cleanEmail}`, 'success');
+          return;
         }
+      } catch (fbErr: unknown) {
+        // If Firebase Auth fails, fall back to local accounts storage
+        const rawAccounts = localStorage.getItem(LOCAL_ACCOUNTS_KEY);
+        const accounts: LocalAccountRecord[] = rawAccounts ? JSON.parse(rawAccounts) : [];
+        const found = accounts.find((a) => a.email.toLowerCase() === cleanEmail);
+
+        if (!found) {
+          const errMessage = fbErr instanceof Error ? fbErr.message : '';
+          if (errMessage.includes('user-not-found') || errMessage.includes('invalid-credential') || errMessage.includes('invalid-email')) {
+            throw new Error('No account found with this email address. Please click "Create Account" to register first.');
+          }
+          if (errMessage.includes('wrong-password')) {
+            throw new Error('Incorrect password. Please try again.');
+          }
+          throw new Error('No account found with this email address. Please click "Create Account" to register first.');
+        }
+
+        if (found.passwordHash !== password) {
+          throw new Error('Incorrect password. Please try again or reset your password.');
+        }
+
+        localStorage.setItem(
+          LOCAL_SESSION_KEY,
+          JSON.stringify({
+            userId: found.userId,
+            name: found.name,
+            email: found.email,
+          })
+        );
+
+        setIsAuthenticated(true);
+        setIsFirestoreBacked(false);
+        loadLocalWorkspace(found.userId, found.name, found.email);
+        addToast('Welcome back!', `Signed in as ${found.name}`, 'success');
+        return;
       }
-
-      if (!found) {
-        throw new Error('No account found with this email address. Please click "Create Account" to register first.');
-      }
-
-      if (found.passwordHash !== password) {
-        throw new Error('Incorrect password. Please try again or reset your password.');
-      }
-
-      localStorage.setItem(
-        LOCAL_SESSION_KEY,
-        JSON.stringify({
-          userId: found.userId,
-          name: found.name,
-          email: found.email,
-        })
-      );
-
-      setIsAuthenticated(true);
-      loadLocalWorkspace(found.userId, found.name, found.email);
-      addToast('Welcome back!', `Signed in as ${found.name}`, 'success');
     },
-    [loadLocalWorkspace, addToast]
+    [setupFirestoreWorkspace, loadLocalWorkspace, addToast]
   );
 
   const signUpWithEmail = useCallback(
@@ -750,43 +761,53 @@ export const WattWiseProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         throw new Error('Password must be at least 6 characters.');
       }
 
-      const rawAccounts = localStorage.getItem(LOCAL_ACCOUNTS_KEY);
-      const accounts: LocalAccountRecord[] = rawAccounts ? JSON.parse(rawAccounts) : [];
+      try {
+        // Try Firebase Auth registration first for cross-device support
+        const cred = await createUserWithEmailAndPassword(auth, cleanEmail, password);
+        if (cred.user) {
+          await updateFirebaseAuthProfile(cred.user, { displayName: cleanName });
+          localStorage.removeItem(LOCAL_SESSION_KEY);
+          setIsAuthenticated(true);
+          setIsFirestoreBacked(true);
+          await setupFirestoreWorkspace(cred.user);
+          setShowSetupWizard(true);
+          addToast('Account Created!', `Welcome to WattWise, ${cleanName}!`, 'success');
+          return;
+        }
+      } catch (fbErr: unknown) {
+        const errMessage = fbErr instanceof Error ? fbErr.message : '';
+        if (errMessage.includes('email-already-in-use')) {
+          throw new Error('An account with this email already exists. Please sign in instead.');
+        }
 
-      // Remove any stale duplicate for this email to allow re-registration if cleared
-      const filteredAccounts = accounts.filter((a) => a.email.toLowerCase() !== cleanEmail);
+        // Fallback to local accounts storage if Firebase Auth throws network/other error
+        const rawAccounts = localStorage.getItem(LOCAL_ACCOUNTS_KEY);
+        const accounts: LocalAccountRecord[] = rawAccounts ? JSON.parse(rawAccounts) : [];
+        const filteredAccounts = accounts.filter((a) => a.email.toLowerCase() !== cleanEmail);
 
-      const userId = sanitizeId(`user-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`);
-      const newAccount: LocalAccountRecord = {
-        userId,
-        name: cleanName,
-        email: cleanEmail,
-        passwordHash: password,
-      };
+        const userId = sanitizeId(`user-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`);
+        const newAccount: LocalAccountRecord = {
+          userId,
+          name: cleanName,
+          email: cleanEmail,
+          passwordHash: password,
+        };
 
-      const updatedAccounts = [...filteredAccounts, newAccount];
-      localStorage.setItem(LOCAL_ACCOUNTS_KEY, JSON.stringify(updatedAccounts));
-      localStorage.setItem(
-        LOCAL_SESSION_KEY,
-        JSON.stringify({ userId, name: cleanName, email: cleanEmail })
-      );
+        const updatedAccounts = [...filteredAccounts, newAccount];
+        localStorage.setItem(LOCAL_ACCOUNTS_KEY, JSON.stringify(updatedAccounts));
+        localStorage.setItem(
+          LOCAL_SESSION_KEY,
+          JSON.stringify({ userId, name: cleanName, email: cleanEmail })
+        );
 
-      // Try creating in Firebase Auth in background (non-blocking if offline)
-      createUserWithEmailAndPassword(auth, cleanEmail, password)
-        .then((cred) => {
-          if (cred.user) {
-            updateFirebaseAuthProfile(cred.user, { displayName: cleanName }).catch(() => {});
-            setIsFirestoreBacked(true);
-          }
-        })
-        .catch(() => {});
-
-      setIsAuthenticated(true);
-      loadLocalWorkspace(userId, cleanName, cleanEmail);
-      setShowSetupWizard(true);
-      addToast('Account Created!', `Welcome to WattWise, ${cleanName}!`, 'success');
+        setIsAuthenticated(true);
+        setIsFirestoreBacked(false);
+        loadLocalWorkspace(userId, cleanName, cleanEmail);
+        setShowSetupWizard(true);
+        addToast('Account Created!', `Welcome to WattWise, ${cleanName}!`, 'success');
+      }
     },
-    [loadLocalWorkspace, addToast]
+    [setupFirestoreWorkspace, loadLocalWorkspace, addToast]
   );
 
   const resetPasswordForEmail = useCallback(
@@ -882,6 +903,7 @@ export const WattWiseProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     async (input: {
       meterName: string;
       meterNumber: string;
+      ownerName?: string;
       location: string;
       provider: string;
       iconType: MeterIconType;
@@ -905,12 +927,14 @@ export const WattWiseProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         0,
         VALIDATION_CONSTRAINTS.MAX_METER_NUMBER_LEN
       );
+      const owner = (input.ownerName?.trim() || userProfile.name || 'User').slice(0, 100);
 
       const newMeter: ElectricityMeter = {
         meterId,
         userId: userProfile.userId,
         meterName: serialNo,
         meterNumber: refNo,
+        ownerName: owner,
         location: input.location.trim().slice(0, VALIDATION_CONSTRAINTS.MAX_LOCATION_LEN),
         provider: (input.provider.trim() || 'LESCO').slice(0, VALIDATION_CONSTRAINTS.MAX_PROVIDER_LEN),
         iconType: input.iconType || 'home',
@@ -1017,7 +1041,7 @@ export const WattWiseProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         type: 'meter_added',
         category: 'system',
         title: `${newMeter.meterName} meter added`,
-        message: `Meter ${newMeter.meterName} (${newMeter.meterNumber}) registered with a monthly limit of ${limit.toLocaleString()} units.`,
+        message: `Meter ${newMeter.meterName} (${newMeter.meterNumber}) registered for owner ${owner}.`,
         threshold: 0,
       });
 
@@ -1034,6 +1058,7 @@ export const WattWiseProvider: React.FC<{ children: React.ReactNode }> = ({ chil
           ElectricityMeter,
           | 'meterName'
           | 'meterNumber'
+          | 'ownerName'
           | 'location'
           | 'provider'
           | 'iconType'
@@ -1061,6 +1086,10 @@ export const WattWiseProvider: React.FC<{ children: React.ReactNode }> = ({ chil
           updates.meterNumber !== undefined
             ? updates.meterNumber.trim().slice(0, VALIDATION_CONSTRAINTS.MAX_METER_NUMBER_LEN)
             : existingMeter.meterNumber,
+        ownerName:
+          updates.ownerName !== undefined
+            ? updates.ownerName.trim().slice(0, 100)
+            : existingMeter.ownerName,
         location:
           updates.location !== undefined
             ? updates.location.trim().slice(0, VALIDATION_CONSTRAINTS.MAX_LOCATION_LEN)

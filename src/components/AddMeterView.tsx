@@ -29,6 +29,7 @@ export const AddMeterView: React.FC = () => {
 
   const [serialNumber, setSerialNumber] = useState('');
   const [referenceNumber, setReferenceNumber] = useState('');
+  const [ownerName, setOwnerName] = useState(userProfile?.name || '');
   const [location, setLocation] = useState('');
   const [provider, setProvider] = useState('LESCO');
   const [iconType, setIconType] = useState<MeterIconType>('home');
@@ -45,6 +46,7 @@ export const AddMeterView: React.FC = () => {
     if (editingMeter) {
       setSerialNumber(editingMeter.meterName);
       setReferenceNumber(editingMeter.meterNumber === 'N/A' ? '' : editingMeter.meterNumber);
+      setOwnerName(editingMeter.ownerName || userProfile?.name || '');
       setLocation(editingMeter.location);
       setProvider(editingMeter.provider);
       setIconType(editingMeter.iconType);
@@ -55,6 +57,7 @@ export const AddMeterView: React.FC = () => {
     } else {
       setSerialNumber('');
       setReferenceNumber('');
+      setOwnerName(userProfile?.name || '');
       setLocation('');
       setProvider('LESCO');
       setIconType('home');
@@ -63,7 +66,7 @@ export const AddMeterView: React.FC = () => {
       setFixedCharges('100');
       setInitialReading('0');
     }
-  }, [editingMeter]);
+  }, [editingMeter, userProfile]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -87,10 +90,12 @@ export const AddMeterView: React.FC = () => {
     setIsSaving(true);
     try {
       const cleanRef = referenceNumber.trim() || 'N/A';
+      const cleanOwner = ownerName.trim() || userProfile?.name || 'User';
       if (editingMeter) {
         await updateMeter(editingMeter.meterId, {
           meterName: serialNumber.trim(),
           meterNumber: cleanRef,
+          ownerName: cleanOwner,
           location,
           provider,
           iconType,
@@ -103,6 +108,7 @@ export const AddMeterView: React.FC = () => {
         await addMeter({
           meterName: serialNumber.trim(),
           meterNumber: cleanRef,
+          ownerName: cleanOwner,
           location,
           provider,
           iconType,
@@ -128,8 +134,8 @@ export const AddMeterView: React.FC = () => {
         </h1>
         <p className="text-sm text-slate-500 mt-0.5">
           {editingMeter
-            ? 'Update meter serial number, reference number, monthly unit limit, and tariff'
-            : 'Register a new electricity meter with its serial number and reference number'}
+            ? 'Update meter serial number, reference number, owner name, monthly unit limit, and tariff'
+            : 'Register a new electricity meter with its serial number, reference number, and owner name'}
         </p>
       </div>
 
@@ -175,6 +181,20 @@ export const AddMeterView: React.FC = () => {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                Meter Owner Name *
+              </label>
+              <input
+                type="text"
+                value={ownerName}
+                onChange={(e) => setOwnerName(e.target.value)}
+                placeholder="Enter owner or consumer name"
+                required
+                className="w-full px-3.5 py-2.5 text-sm rounded-lg border border-slate-300 focus:border-[#1D63ED] outline-none"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 mb-1.5">
                 Location
               </label>
               <input
@@ -185,7 +205,9 @@ export const AddMeterView: React.FC = () => {
                 className="w-full px-3.5 py-2.5 text-sm rounded-lg border border-slate-300 focus:border-[#1D63ED] outline-none"
               />
             </div>
+          </div>
 
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="block text-xs font-semibold text-slate-700 mb-1.5">
                 Meter Category Icon
@@ -202,26 +224,26 @@ export const AddMeterView: React.FC = () => {
                 <option value="apartment">Apartment / Floor</option>
               </select>
             </div>
-          </div>
 
-          <div>
-            <label className="block text-xs font-semibold text-slate-700 mb-1.5">
-              Electricity Provider
-            </label>
-            <select
-              value={provider}
-              onChange={(e) => setProvider(e.target.value)}
-              className="w-full px-3.5 py-2.5 text-sm rounded-lg border border-slate-300 focus:border-[#1D63ED] outline-none bg-white"
-            >
-              <option value="LESCO">LESCO</option>
-              <option value="K-Electric">K-Electric</option>
-              <option value="IESCO">IESCO</option>
-              {PROVIDERS.map((p) => (
-                <option key={p} value={p}>
-                  {p}
-                </option>
-              ))}
-            </select>
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                Electricity Provider
+              </label>
+              <select
+                value={provider}
+                onChange={(e) => setProvider(e.target.value)}
+                className="w-full px-3.5 py-2.5 text-sm rounded-lg border border-slate-300 focus:border-[#1D63ED] outline-none bg-white"
+              >
+                <option value="LESCO">LESCO</option>
+                <option value="K-Electric">K-Electric</option>
+                <option value="IESCO">IESCO</option>
+                {PROVIDERS.map((p) => (
+                  <option key={p} value={p}>
+                    {p}
+                  </option>
+                ))}
+              </select>
+            </div>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -257,72 +279,68 @@ export const AddMeterView: React.FC = () => {
 
             <div>
               <label className="block text-xs font-semibold text-slate-700 mb-1.5">
-                Fixed Charges ({currency})
+                Initial Opening Reading *
               </label>
-              <input
-                type="number"
-                min={0}
-                value={fixedCharges}
-                onChange={(e) => setFixedCharges(e.target.value)}
-                placeholder="e.g. 100"
-                className="w-full px-3.5 py-2.5 text-sm rounded-lg border border-slate-300 focus:border-[#1D63ED] outline-none tabular-nums"
-              />
-            </div>
-          </div>
-
-          {!editingMeter && (
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-0.5">
-                Initial Reading
-              </label>
-              <p className="text-[11px] text-slate-400 mb-1.5">
-                (You can update it later from Enter Reading)
-              </p>
               <input
                 type="number"
                 min={0}
                 value={initialReading}
                 onChange={(e) => setInitialReading(e.target.value)}
-                className="w-full px-3.5 py-2.5 text-sm rounded-lg border border-slate-300 focus:border-[#1D63ED] outline-none tabular-nums"
+                placeholder="e.g. 12450"
+                required
+                disabled={Boolean(editingMeter)}
+                className="w-full px-3.5 py-2.5 text-sm rounded-lg border border-slate-300 focus:border-[#1D63ED] outline-none tabular-nums disabled:bg-slate-100 disabled:text-slate-500"
               />
             </div>
-          )}
+          </div>
 
-          <div className="flex items-center justify-end gap-3 pt-4">
+          <div className="pt-4 flex items-center justify-end gap-3">
             <button
               type="button"
               onClick={() => {
                 setEditingMeter(null);
                 setActivePage('meters');
               }}
-              className="px-5 py-2.5 rounded-lg border border-slate-200 text-xs font-semibold text-slate-700 hover:bg-slate-50 cursor-pointer"
+              className="px-5 py-2.5 rounded-lg border border-slate-200 hover:bg-slate-50 text-xs font-semibold text-slate-700 transition-colors cursor-pointer"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={isSaving}
-              className="px-6 py-2.5 rounded-lg bg-[#1D63ED] hover:bg-[#1652C8] text-white text-xs font-semibold shadow-xs transition-colors cursor-pointer"
+              className="px-6 py-2.5 rounded-lg bg-[#1D63ED] hover:bg-[#1652C8] text-white text-xs font-semibold shadow-sm transition-colors cursor-pointer disabled:opacity-50"
             >
-              {isSaving ? 'Saving...' : editingMeter ? 'Update Meter' : 'Save Meter'}
+              {isSaving ? 'Saving...' : editingMeter ? 'Update Meter' : 'Register Meter'}
             </button>
           </div>
         </form>
 
-        {/* Right Illustration Card */}
-        <div className="lg:col-span-4 bg-gradient-to-b from-blue-50/80 to-indigo-50/40 rounded-2xl border border-blue-100 p-6 flex flex-col items-center justify-center text-center h-full">
-          <div className="w-28 h-28 rounded-2xl bg-white shadow-md border border-blue-100 flex flex-col items-center justify-center mb-5 relative">
-            <div className="px-2 py-0.5 bg-blue-50 border border-blue-200 rounded text-[11px] font-mono font-bold text-[#1D63ED] mb-1.5">
-              SN / REF
+        {/* Right Info Card */}
+        <div className="lg:col-span-4 bg-slate-50 rounded-xl p-6 border border-slate-200/80 space-y-4">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-blue-100 text-[#1D63ED] flex items-center justify-center">
+              <Gauge className="w-5 h-5" />
             </div>
-            <Gauge className="w-11 h-11 text-[#1D63ED]" />
+            <div>
+              <h3 className="text-sm font-bold text-slate-900">Meter Registration</h3>
+              <p className="text-[11px] text-slate-500">Electricity asset details</p>
+            </div>
           </div>
-          <h3 className="text-base font-bold text-slate-800 max-w-[220px] leading-snug">
-            Track meters by Serial & Reference Number
-          </h3>
-          <p className="text-xs text-slate-500 mt-2 max-w-[240px] leading-relaxed">
-            Each meter maintains its own serial number, reference number, independent readings, monthly limit, and history.
-          </p>
+
+          <div className="space-y-2.5 text-xs text-slate-600 leading-relaxed">
+            <p>
+              <strong>Serial Number:</strong> The physical identification number printed on your electricity meter.
+            </p>
+            <p>
+              <strong>Reference Number:</strong> Your utility provider account or consumer reference number for billing.
+            </p>
+            <p>
+              <strong>Owner Name:</strong> The registered owner or consumer name for this meter.
+            </p>
+            <p>
+              <strong>Opening Reading:</strong> The meter reading value at the start of the billing period.
+            </p>
+          </div>
         </div>
       </div>
     </div>

@@ -1,19 +1,20 @@
 import React, { useState } from 'react';
-import { Zap, Plus, X } from 'lucide-react';
+import { Zap, X } from 'lucide-react';
 import { useWattWise } from '../context/WattWiseContext';
 import { MeterIconType } from '../types';
 
 export const SetupWizardModal: React.FC = () => {
-  const { showSetupWizard, setShowSetupWizard, addMeter } = useWattWise();
+  const { showSetupWizard, setShowSetupWizard, addMeter, userProfile } = useWattWise();
 
   const [serialNumber, setSerialNumber] = useState('');
   const [referenceNumber, setReferenceNumber] = useState('');
+  const [ownerName, setOwnerName] = useState(userProfile?.name || '');
   const [location, setLocation] = useState('');
   const [provider, setProvider] = useState('LESCO');
   const [iconType] = useState<MeterIconType>('home');
-  const [monthlyLimit, setMonthlyLimit] = useState('');
-  const [estimatedRate, setEstimatedRate] = useState('');
-  const [initialReading, setInitialReading] = useState('');
+  const [monthlyLimit, setMonthlyLimit] = useState('500');
+  const [estimatedRate, setEstimatedRate] = useState('35');
+  const [initialReading, setInitialReading] = useState('0');
   const [isSaving, setIsSaving] = useState(false);
 
   if (!showSetupWizard) return null;
@@ -26,6 +27,7 @@ export const SetupWizardModal: React.FC = () => {
       await addMeter({
         meterName: serialNumber.trim(),
         meterNumber: referenceNumber.trim() || 'N/A',
+        ownerName: ownerName.trim() || userProfile?.name || 'User',
         location: location.trim(),
         provider: provider.trim() || 'LESCO',
         iconType,
@@ -66,7 +68,7 @@ export const SetupWizardModal: React.FC = () => {
         <div className="p-6 space-y-5">
           <form onSubmit={handleCreateFirstMeter} className="space-y-4">
             <div className="text-xs font-semibold text-slate-500">
-              Enter your meter serial number and reference number to start tracking:
+              Enter your meter serial number, reference number, and owner name to start tracking:
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
@@ -100,6 +102,19 @@ export const SetupWizardModal: React.FC = () => {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
               <div>
                 <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  Owner Name *
+                </label>
+                <input
+                  type="text"
+                  value={ownerName}
+                  onChange={(e) => setOwnerName(e.target.value)}
+                  placeholder="e.g. John Doe"
+                  required
+                  className="w-full px-3 py-2 text-sm rounded-lg border border-slate-300 focus:border-[#1D63ED] outline-none"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">
                   Location
                 </label>
                 <input
@@ -107,18 +122,6 @@ export const SetupWizardModal: React.FC = () => {
                   value={location}
                   onChange={(e) => setLocation(e.target.value)}
                   placeholder="e.g. Main house"
-                  className="w-full px-3 py-2 text-sm rounded-lg border border-slate-300 focus:border-[#1D63ED] outline-none"
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  Provider
-                </label>
-                <input
-                  type="text"
-                  value={provider}
-                  onChange={(e) => setProvider(e.target.value)}
-                  placeholder="e.g. LESCO"
                   className="w-full px-3 py-2 text-sm rounded-lg border border-slate-300 focus:border-[#1D63ED] outline-none"
                 />
               </div>
@@ -168,21 +171,13 @@ export const SetupWizardModal: React.FC = () => {
               </div>
             </div>
 
-            <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-100">
-              <button
-                type="button"
-                onClick={() => setShowSetupWizard(false)}
-                className="px-4 py-2 rounded-lg border border-slate-200 text-xs font-semibold text-slate-600 hover:bg-slate-50 cursor-pointer"
-              >
-                Skip for Now
-              </button>
+            <div className="pt-2">
               <button
                 type="submit"
                 disabled={isSaving}
-                className="px-4 py-2 rounded-lg bg-[#1D63ED] hover:bg-[#1652C8] text-white text-xs font-semibold flex items-center gap-1.5 cursor-pointer"
+                className="w-full py-2.5 rounded-lg bg-[#1D63ED] hover:bg-[#1652C8] text-white text-xs font-semibold shadow-sm transition-colors cursor-pointer disabled:opacity-50"
               >
-                <Plus className="w-4 h-4" />
-                <span>{isSaving ? 'Adding...' : 'Add Meter & Continue'}</span>
+                {isSaving ? 'Saving Meter...' : 'Save Meter & Open Dashboard'}
               </button>
             </div>
           </form>
