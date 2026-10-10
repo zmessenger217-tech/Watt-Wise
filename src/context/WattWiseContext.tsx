@@ -687,10 +687,32 @@ export const WattWiseProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
       const rawAccounts = localStorage.getItem(LOCAL_ACCOUNTS_KEY);
       const accounts: LocalAccountRecord[] = rawAccounts ? JSON.parse(rawAccounts) : [];
-      const found = accounts.find((a) => a.email.toLowerCase() === cleanEmail);
+      let found = accounts.find((a) => a.email.toLowerCase() === cleanEmail);
+
+      // If not in local accounts, try Firebase Auth sign in
+      if (!found) {
+        try {
+          const cred = await signInWithEmailAndPassword(auth, cleanEmail, password);
+          if (cred.user) {
+            const userId = sanitizeId(`user-${cred.user.uid}`);
+            const userName = cred.user.displayName || cleanEmail.split('@')[0];
+            found = {
+              userId,
+              name: userName,
+              email: cleanEmail,
+              passwordHash: password,
+            };
+            const updated = [...accounts.filter(a => a.email.toLowerCase() !== cleanEmail), found];
+            localStorage.setItem(LOCAL_ACCOUNTS_KEY, JSON.stringify(updated));
+            setIsFirestoreBacked(true);
+          }
+        } catch {
+          // ignore firebase auth error and fall through to error message below
+        }
+      }
 
       if (!found) {
-        throw new Error('No account found with this email address. Please click Sign Up to create an account first.');
+        throw new Error('No account found with this email address. Please click "Create Account" to register first.');
       }
 
       if (found.passwordHash !== password) {
@@ -707,7 +729,6 @@ export const WattWiseProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       );
 
       setIsAuthenticated(true);
-      setIsFirestoreBacked(false);
       loadLocalWorkspace(found.userId, found.name, found.email);
       addToast('Welcome back!', `Signed in as ${found.name}`, 'success');
     },
@@ -732,9 +753,8 @@ export const WattWiseProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       const rawAccounts = localStorage.getItem(LOCAL_ACCOUNTS_KEY);
       const accounts: LocalAccountRecord[] = rawAccounts ? JSON.parse(rawAccounts) : [];
 
-      if (accounts.some((a) => a.email.toLowerCase() === cleanEmail)) {
-        throw new Error('An account with this email already exists. Please sign in instead.');
-      }
+      // Remove any stale duplicate for this email to allow re-registration if cleared
+      const filteredAccounts = accounts.filter((a) => a.email.toLowerCase() !== cleanEmail);
 
       const userId = sanitizeId(`user-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`);
       const newAccount: LocalAccountRecord = {
@@ -744,15 +764,24 @@ export const WattWiseProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         passwordHash: password,
       };
 
-      const updatedAccounts = [...accounts, newAccount];
+      const updatedAccounts = [...filteredAccounts, newAccount];
       localStorage.setItem(LOCAL_ACCOUNTS_KEY, JSON.stringify(updatedAccounts));
       localStorage.setItem(
         LOCAL_SESSION_KEY,
         JSON.stringify({ userId, name: cleanName, email: cleanEmail })
       );
 
+      // Try creating in Firebase Auth in background (non-blocking if offline)
+      createUserWithEmailAndPassword(auth, cleanEmail, password)
+        .then((cred) => {
+          if (cred.user) {
+            updateFirebaseAuthProfile(cred.user, { displayName: cleanName }).catch(() => {});
+            setIsFirestoreBacked(true);
+          }
+        })
+        .catch(() => {});
+
       setIsAuthenticated(true);
-      setIsFirestoreBacked(false);
       loadLocalWorkspace(userId, cleanName, cleanEmail);
       setShowSetupWizard(true);
       addToast('Account Created!', `Welcome to WattWise, ${cleanName}!`, 'success');
