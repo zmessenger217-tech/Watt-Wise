@@ -1,0 +1,691 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "UserProfile",
+      "description": "User account profile, currency, timezone, and notification preferences.",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[a-zA-Z0-9_\\-]+$",
+          "description": "Unique UID of the authenticated user."
+        },
+        "name": {
+          "type": "string",
+          "maxLength": 100,
+          "minLength": 1,
+          "description": "Display name of the user."
+        },
+        "email": {
+          "type": "string",
+          "maxLength": 254,
+          "minLength": 3,
+          "description": "Email address of the user."
+        },
+        "currency": {
+          "type": "string",
+          "maxLength": 20,
+          "minLength": 1,
+          "description": "Preferred currency code such as PKR, USD, EUR, GBP."
+        },
+        "timezone": {
+          "type": "string",
+          "maxLength": 64,
+          "minLength": 1,
+          "description": "User timezone identifier for monthly boundaries."
+        },
+        "inAppNotifications": {
+          "type": "boolean",
+          "description": "Whether in-app notifications are enabled."
+        },
+        "browserPushNotifications": {
+          "type": "boolean",
+          "description": "Whether browser push notifications are enabled."
+        },
+        "emailNotifications": {
+          "type": "boolean",
+          "description": "Whether email notifications are enabled."
+        },
+        "quietHoursStart": {
+          "type": "string",
+          "maxLength": 5,
+          "minLength": 5,
+          "description": "Start time for quiet hours in HH:mm format."
+        },
+        "quietHoursEnd": {
+          "type": "string",
+          "maxLength": 5,
+          "minLength": 5,
+          "description": "End time for quiet hours in HH:mm format."
+        },
+        "readingReminderDays": {
+          "type": "number",
+          "description": "Days between reading entry reminders."
+        },
+        "setupCompleted": {
+          "type": "boolean",
+          "description": "Whether the user has completed the first-time meter setup wizard."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp when the profile was created."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp when the profile was last updated."
+        }
+      },
+      "required": [
+        "userId",
+        "name",
+        "email",
+        "currency",
+        "timezone",
+        "inAppNotifications",
+        "browserPushNotifications",
+        "emailNotifications",
+        "quietHoursStart",
+        "quietHoursEnd",
+        "readingReminderDays",
+        "setupCompleted",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "ElectricityMeter": {
+      "title": "ElectricityMeter",
+      "description": "Independent electricity meter belonging to a user account.",
+      "type": "object",
+      "properties": {
+        "meterId": {
+          "type": "string",
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[a-zA-Z0-9_\\-]+$",
+          "description": "Unique identifier of the meter."
+        },
+        "userId": {
+          "type": "string",
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[a-zA-Z0-9_\\-]+$",
+          "description": "UID of the user who owns this meter."
+        },
+        "meterName": {
+          "type": "string",
+          "maxLength": 80,
+          "minLength": 1,
+          "description": "User-friendly nickname such as Home, Office, Shop."
+        },
+        "meterNumber": {
+          "type": "string",
+          "maxLength": 60,
+          "minLength": 1,
+          "description": "Registered utility electricity meter number."
+        },
+        "location": {
+          "type": "string",
+          "maxLength": 160,
+          "minLength": 0,
+          "description": "Physical address or floor location."
+        },
+        "provider": {
+          "type": "string",
+          "maxLength": 80,
+          "minLength": 1,
+          "description": "Electricity utility provider name."
+        },
+        "iconType": {
+          "type": "string",
+          "maxLength": 20,
+          "minLength": 1,
+          "enum": ["home", "office", "shop", "factory", "apartment"],
+          "description": "Category icon identifier for the meter."
+        },
+        "monthlyLimit": {
+          "type": "number",
+          "description": "Configured monthly unit consumption limit."
+        },
+        "estimatedRate": {
+          "type": "number",
+          "description": "Estimated electricity rate per unit."
+        },
+        "fixedCharges": {
+          "type": "number",
+          "description": "Fixed monthly utility charges."
+        },
+        "additionalCharges": {
+          "type": "number",
+          "description": "Additional monthly fees or surcharges."
+        },
+        "taxPercentage": {
+          "type": "number",
+          "description": "Estimated tax percentage applied to energy charges."
+        },
+        "currentMonthId": {
+          "type": "string",
+          "maxLength": 7,
+          "minLength": 7,
+          "pattern": "^[0-9]{4}-[0-9]{2}$",
+          "description": "Active billing month in YYYY-MM format."
+        },
+        "openingReading": {
+          "type": "number",
+          "description": "Current month opening meter reading."
+        },
+        "previousReading": {
+          "type": "number",
+          "description": "Previously recorded reading inside the current month."
+        },
+        "previousReadingDate": {
+          "type": "string",
+          "maxLength": 30,
+          "minLength": 10,
+          "description": "ISO date string of the previous reading."
+        },
+        "currentReading": {
+          "type": "number",
+          "description": "Latest meter reading."
+        },
+        "lastReadingDate": {
+          "type": "string",
+          "maxLength": 30,
+          "minLength": 10,
+          "description": "ISO date string of the latest reading."
+        },
+        "unitsConsumed": {
+          "type": "number",
+          "description": "Calculated units consumed in the active month (currentReading - openingReading)."
+        },
+        "lastClosingReading": {
+          "type": "number",
+          "description": "Previous month closing reading."
+        },
+        "lastAlertThreshold": {
+          "type": "number",
+          "description": "Highest notification threshold crossed in the current month."
+        },
+        "lastAlertSentAt": {
+          "type": "string",
+          "maxLength": 40,
+          "minLength": 0,
+          "description": "ISO timestamp when the last alert was sent."
+        },
+        "isActive": {
+          "type": "boolean",
+          "description": "Whether the meter is active."
+        },
+        "isArchived": {
+          "type": "boolean",
+          "description": "Whether the meter is archived."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp when the meter was created."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp when the meter was last updated."
+        }
+      },
+      "required": [
+        "meterId",
+        "userId",
+        "meterName",
+        "meterNumber",
+        "location",
+        "provider",
+        "iconType",
+        "monthlyLimit",
+        "estimatedRate",
+        "fixedCharges",
+        "additionalCharges",
+        "taxPercentage",
+        "currentMonthId",
+        "openingReading",
+        "previousReading",
+        "previousReadingDate",
+        "currentReading",
+        "lastReadingDate",
+        "unitsConsumed",
+        "lastClosingReading",
+        "lastAlertThreshold",
+        "lastAlertSentAt",
+        "isActive",
+        "isArchived",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "MonthlyRecord": {
+      "title": "MonthlyRecord",
+      "description": "Month-by-month consumption record and spreadsheet snapshot for a meter.",
+      "type": "object",
+      "properties": {
+        "monthId": {
+          "type": "string",
+          "maxLength": 7,
+          "minLength": 7,
+          "pattern": "^[0-9]{4}-[0-9]{2}$",
+          "description": "Month identifier in YYYY-MM format."
+        },
+        "meterId": {
+          "type": "string",
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[a-zA-Z0-9_\\-]+$",
+          "description": "Associated meter ID."
+        },
+        "userId": {
+          "type": "string",
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[a-zA-Z0-9_\\-]+$",
+          "description": "Owner user ID."
+        },
+        "meterName": {
+          "type": "string",
+          "maxLength": 80,
+          "minLength": 1,
+          "description": "Snapshot of meter name."
+        },
+        "meterNumber": {
+          "type": "string",
+          "maxLength": 60,
+          "minLength": 1,
+          "description": "Snapshot of meter number."
+        },
+        "openingReading": {
+          "type": "number",
+          "description": "Opening reading at the start of the month."
+        },
+        "currentReading": {
+          "type": "number",
+          "description": "Latest reading during the month."
+        },
+        "closingReading": {
+          "type": "number",
+          "description": "Final reading when the month is finalized."
+        },
+        "unitsConsumed": {
+          "type": "number",
+          "description": "Total units consumed during the month."
+        },
+        "monthlyLimitSnapshot": {
+          "type": "number",
+          "description": "Monthly unit limit configured for this month."
+        },
+        "estimatedRateSnapshot": {
+          "type": "number",
+          "description": "Rate per unit configured for this month."
+        },
+        "fixedChargesSnapshot": {
+          "type": "number",
+          "description": "Fixed charges configured for this month."
+        },
+        "estimatedCost": {
+          "type": "number",
+          "description": "Calculated estimated electricity cost for this month."
+        },
+        "status": {
+          "type": "string",
+          "maxLength": 20,
+          "minLength": 1,
+          "enum": ["active", "finalized"],
+          "description": "Lifecycle state of the monthly record."
+        },
+        "readingsCount": {
+          "type": "number",
+          "description": "Number of readings recorded in this month."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp when the monthly record was created."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp when the monthly record was updated."
+        }
+      },
+      "required": [
+        "monthId",
+        "meterId",
+        "userId",
+        "meterName",
+        "meterNumber",
+        "openingReading",
+        "currentReading",
+        "closingReading",
+        "unitsConsumed",
+        "monthlyLimitSnapshot",
+        "estimatedRateSnapshot",
+        "fixedChargesSnapshot",
+        "estimatedCost",
+        "status",
+        "readingsCount",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "MeterReading": {
+      "title": "MeterReading",
+      "description": "Individual timestamped electricity meter reading entry.",
+      "type": "object",
+      "properties": {
+        "readingId": {
+          "type": "string",
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[a-zA-Z0-9_\\-]+$",
+          "description": "Unique reading ID."
+        },
+        "meterId": {
+          "type": "string",
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[a-zA-Z0-9_\\-]+$",
+          "description": "Associated meter ID."
+        },
+        "monthId": {
+          "type": "string",
+          "maxLength": 7,
+          "minLength": 7,
+          "pattern": "^[0-9]{4}-[0-9]{2}$",
+          "description": "Associated month ID in YYYY-MM format."
+        },
+        "userId": {
+          "type": "string",
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[a-zA-Z0-9_\\-]+$",
+          "description": "Owner user ID."
+        },
+        "readingValue": {
+          "type": "number",
+          "description": "Entered meter reading value."
+        },
+        "previousReadingValue": {
+          "type": "number",
+          "description": "Previous reading value prior to this entry."
+        },
+        "unitsSincePreviousReading": {
+          "type": "number",
+          "description": "Units consumed since the immediately preceding reading."
+        },
+        "totalMonthUnits": {
+          "type": "number",
+          "description": "Cumulative units consumed in the month at this reading."
+        },
+        "readingDate": {
+          "type": "string",
+          "maxLength": 30,
+          "minLength": 10,
+          "description": "Date of reading."
+        },
+        "note": {
+          "type": "string",
+          "maxLength": 200,
+          "minLength": 0,
+          "description": "Optional note or correction explanation."
+        },
+        "isRolloverOrCorrection": {
+          "type": "boolean",
+          "description": "Whether this entry was a meter correction or rollover."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp when created."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp when updated."
+        }
+      },
+      "required": [
+        "readingId",
+        "meterId",
+        "monthId",
+        "userId",
+        "readingValue",
+        "previousReadingValue",
+        "unitsSincePreviousReading",
+        "totalMonthUnits",
+        "readingDate",
+        "note",
+        "isRolloverOrCorrection",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "AppNotification": {
+      "title": "AppNotification",
+      "description": "Smart threshold alert, reminder, or system notification per meter.",
+      "type": "object",
+      "properties": {
+        "notificationId": {
+          "type": "string",
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[a-zA-Z0-9_\\-]+$",
+          "description": "Unique notification ID."
+        },
+        "userId": {
+          "type": "string",
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[a-zA-Z0-9_\\-]+$",
+          "description": "Owner user ID."
+        },
+        "meterId": {
+          "type": "string",
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[a-zA-Z0-9_\\-]+$",
+          "description": "Associated meter ID or system identifier."
+        },
+        "meterName": {
+          "type": "string",
+          "maxLength": 80,
+          "minLength": 1,
+          "description": "Name of the meter that triggered the alert."
+        },
+        "monthId": {
+          "type": "string",
+          "maxLength": 7,
+          "minLength": 7,
+          "pattern": "^[0-9]{4}-[0-9]{2}$",
+          "description": "Month in YYYY-MM format."
+        },
+        "type": {
+          "type": "string",
+          "maxLength": 30,
+          "minLength": 1,
+          "enum": [
+            "usage_update",
+            "warning",
+            "strong_warning",
+            "high_alert",
+            "critical",
+            "limit_reached",
+            "limit_exceeded",
+            "reminder",
+            "month_started",
+            "meter_added",
+            "report_ready"
+          ],
+          "description": "Notification severity/event type."
+        },
+        "category": {
+          "type": "string",
+          "maxLength": 20,
+          "minLength": 1,
+          "enum": ["alert", "reminder", "system"],
+          "description": "Filter category for notifications."
+        },
+        "title": {
+          "type": "string",
+          "maxLength": 120,
+          "minLength": 1,
+          "description": "Short notification title."
+        },
+        "message": {
+          "type": "string",
+          "maxLength": 400,
+          "minLength": 1,
+          "description": "Detailed notification message."
+        },
+        "threshold": {
+          "type": "number",
+          "description": "Threshold percentage associated with the alert."
+        },
+        "isRead": {
+          "type": "boolean",
+          "description": "Whether the user has marked the notification as read."
+        },
+        "deliveryChannel": {
+          "type": "string",
+          "maxLength": 60,
+          "minLength": 1,
+          "description": "Channels used such as in-app, browser-push, email."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp when created."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp when updated."
+        }
+      },
+      "required": [
+        "notificationId",
+        "userId",
+        "meterId",
+        "meterName",
+        "monthId",
+        "type",
+        "category",
+        "title",
+        "message",
+        "threshold",
+        "isRead",
+        "deliveryChannel",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "AuditLog": {
+      "title": "AuditLog",
+      "description": "Immutable audit trail record for reading corrections, historical edits, and month transitions.",
+      "type": "object",
+      "properties": {
+        "logId": {
+          "type": "string",
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[a-zA-Z0-9_\\-]+$",
+          "description": "Unique audit log ID."
+        },
+        "userId": {
+          "type": "string",
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[a-zA-Z0-9_\\-]+$",
+          "description": "Owner user ID."
+        },
+        "meterId": {
+          "type": "string",
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[a-zA-Z0-9_\\-]+$",
+          "description": "Target meter ID."
+        },
+        "monthId": {
+          "type": "string",
+          "maxLength": 7,
+          "minLength": 7,
+          "pattern": "^[0-9]{4}-[0-9]{2}$",
+          "description": "Target month ID."
+        },
+        "action": {
+          "type": "string",
+          "maxLength": 80,
+          "minLength": 1,
+          "description": "Action type performed."
+        },
+        "previousValue": {
+          "type": "string",
+          "maxLength": 300,
+          "minLength": 0,
+          "description": "Summary of previous state."
+        },
+        "newValue": {
+          "type": "string",
+          "maxLength": 300,
+          "minLength": 0,
+          "description": "Summary of new state."
+        },
+        "reason": {
+          "type": "string",
+          "maxLength": 300,
+          "minLength": 0,
+          "description": "User reason for correction or change."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp when logged."
+        }
+      },
+      "required": [
+        "logId",
+        "userId",
+        "meterId",
+        "monthId",
+        "action",
+        "previousValue",
+        "newValue",
+        "reason",
+        "createdAt"
+      ]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": { "$ref": "#/entities/UserProfile" },
+      "description": "Stores isolated user profile and notification preferences."
+    },
+    "/users/{userId}/meters/{meterId}": {
+      "schema": { "$ref": "#/entities/ElectricityMeter" },
+      "description": "Stores independent electricity meters owned by the user."
+    },
+    "/users/{userId}/meters/{meterId}/months/{monthId}": {
+      "schema": { "$ref": "#/entities/MonthlyRecord" },
+      "description": "Stores monthly consumption summaries and finalized history per meter."
+    },
+    "/users/{userId}/meters/{meterId}/months/{monthId}/readings/{readingId}": {
+      "schema": { "$ref": "#/entities/MeterReading" },
+      "description": "Stores individual timestamped meter readings within a billing month."
+    },
+    "/users/{userId}/notifications/{notificationId}": {
+      "schema": { "$ref": "#/entities/AppNotification" },
+      "description": "Stores per-meter usage alerts, threshold crossings, and reminders."
+    },
+    "/users/{userId}/auditLogs/{logId}": {
+      "schema": { "$ref": "#/entities/AuditLog" },
+      "description": "Stores immutable audit logs for reading corrections and month finalizations."
+    }
+  }
+}

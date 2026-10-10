@@ -1,0 +1,502 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Global Safety Net: Default-deny catch-all
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // ============================================================================
+    // Phase 3: Primitive Helpers
+    // ============================================================================
+    function isValidId(id) {
+      return id is string && id.size() >= 1 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function isValidMonthId(id) {
+      return id is string && id.size() == 7 && id.matches('^[0-9]{4}-[0-9]{2}$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isSignedIn() {
+      return request.auth != null && request.auth.token.email_verified == true;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function userExists(userId) {
+      return exists(/databases/$(database)/documents/users/$(userId)) &&
+        get(/databases/$(database)/documents/users/$(userId)).data.userId == request.auth.uid;
+    }
+
+    function meterExists(userId, meterId) {
+      return exists(/databases/$(database)/documents/users/$(userId)/meters/$(meterId)) &&
+        get(/databases/$(database)/documents/users/$(userId)/meters/$(meterId)).data.userId == request.auth.uid;
+    }
+
+    function monthExists(userId, meterId, monthId) {
+      return exists(/databases/$(database)/documents/users/$(userId)/meters/$(meterId)/months/$(monthId)) &&
+        get(/databases/$(database)/documents/users/$(userId)/meters/$(meterId)/months/$(monthId)).data.userId == request.auth.uid;
+    }
+
+    // ============================================================================
+    // Validation Blueprints
+    // ============================================================================
+    function isValidUserProfile(data, userId) {
+      return data.keys().hasAll([
+        'userId', 'name', 'email', 'currency', 'timezone',
+        'inAppNotifications', 'browserPushNotifications', 'emailNotifications',
+        'quietHoursStart', 'quietHoursEnd', 'readingReminderDays',
+        'setupCompleted', 'createdAt', 'updatedAt'
+      ]) &&
+      data.keys().hasOnly([
+        'userId', 'name', 'email', 'currency', 'timezone',
+        'inAppNotifications', 'browserPushNotifications', 'emailNotifications',
+        'quietHoursStart', 'quietHoursEnd', 'readingReminderDays',
+        'setupCompleted', 'createdAt', 'updatedAt'
+      ]) &&
+      data.userId is string && data.userId.size() >= 1 && data.userId.size() <= 128 &&
+      data.userId.matches('^[a-zA-Z0-9_\\-]+$') &&
+      data.userId == userId && data.userId == request.auth.uid &&
+      data.name is string && data.name.size() >= 1 && data.name.size() <= 100 &&
+      data.email is string && data.email.size() >= 3 && data.email.size() <= 254 &&
+      data.currency is string && data.currency.size() >= 1 && data.currency.size() <= 20 &&
+      data.timezone is string && data.timezone.size() >= 1 && data.timezone.size() <= 64 &&
+      data.inAppNotifications is bool &&
+      data.browserPushNotifications is bool &&
+      data.emailNotifications is bool &&
+      data.quietHoursStart is string && data.quietHoursStart.size() == 5 &&
+      data.quietHoursEnd is string && data.quietHoursEnd.size() == 5 &&
+      data.readingReminderDays is number && data.readingReminderDays >= 1 && data.readingReminderDays <= 30 &&
+      data.setupCompleted is bool &&
+      data.createdAt is timestamp &&
+      data.updatedAt is timestamp;
+    }
+
+    function isValidElectricityMeter(data, userId, meterId) {
+      return data.keys().hasAll([
+        'meterId', 'userId', 'meterName', 'meterNumber', 'location', 'provider',
+        'iconType', 'monthlyLimit', 'estimatedRate', 'fixedCharges', 'additionalCharges',
+        'taxPercentage', 'currentMonthId', 'openingReading', 'previousReading',
+        'previousReadingDate', 'currentReading', 'lastReadingDate', 'unitsConsumed',
+        'lastClosingReading', 'lastAlertThreshold', 'lastAlertSentAt',
+        'isActive', 'isArchived', 'createdAt', 'updatedAt'
+      ]) &&
+      data.keys().hasOnly([
+        'meterId', 'userId', 'meterName', 'meterNumber', 'location', 'provider',
+        'iconType', 'monthlyLimit', 'estimatedRate', 'fixedCharges', 'additionalCharges',
+        'taxPercentage', 'currentMonthId', 'openingReading', 'previousReading',
+        'previousReadingDate', 'currentReading', 'lastReadingDate', 'unitsConsumed',
+        'lastClosingReading', 'lastAlertThreshold', 'lastAlertSentAt',
+        'isActive', 'isArchived', 'createdAt', 'updatedAt'
+      ]) &&
+      data.meterId is string && data.meterId.size() >= 1 && data.meterId.size() <= 128 &&
+      data.meterId.matches('^[a-zA-Z0-9_\\-]+$') && data.meterId == meterId &&
+      data.userId is string && data.userId.size() >= 1 && data.userId.size() <= 128 &&
+      data.userId.matches('^[a-zA-Z0-9_\\-]+$') && data.userId == userId && data.userId == request.auth.uid &&
+      data.meterName is string && data.meterName.size() >= 1 && data.meterName.size() <= 80 &&
+      data.meterNumber is string && data.meterNumber.size() >= 1 && data.meterNumber.size() <= 60 &&
+      data.location is string && data.location.size() <= 160 &&
+      data.provider is string && data.provider.size() >= 1 && data.provider.size() <= 80 &&
+      data.iconType is string && data.iconType.size() >= 1 && data.iconType.size() <= 20 &&
+      data.iconType in ['home', 'office', 'shop', 'factory', 'apartment'] &&
+      data.monthlyLimit is number && data.monthlyLimit >= 1 && data.monthlyLimit <= 1000000 &&
+      data.estimatedRate is number && data.estimatedRate >= 0 && data.estimatedRate <= 100000 &&
+      data.fixedCharges is number && data.fixedCharges >= 0 && data.fixedCharges <= 1000000 &&
+      data.additionalCharges is number && data.additionalCharges >= 0 && data.additionalCharges <= 1000000 &&
+      data.taxPercentage is number && data.taxPercentage >= 0 && data.taxPercentage <= 100 &&
+      data.currentMonthId is string && data.currentMonthId.size() == 7 &&
+      data.currentMonthId.matches('^[0-9]{4}-[0-9]{2}$') &&
+      data.openingReading is number && data.openingReading >= 0 && data.openingReading <= 999999999 &&
+      data.previousReading is number && data.previousReading >= 0 && data.previousReading <= 999999999 &&
+      data.previousReadingDate is string && data.previousReadingDate.size() >= 10 && data.previousReadingDate.size() <= 30 &&
+      data.currentReading is number && data.currentReading >= 0 && data.currentReading <= 999999999 &&
+      data.lastReadingDate is string && data.lastReadingDate.size() >= 10 && data.lastReadingDate.size() <= 30 &&
+      data.unitsConsumed is number && data.unitsConsumed >= 0 && data.unitsConsumed <= 999999999 &&
+      data.lastClosingReading is number && data.lastClosingReading >= 0 && data.lastClosingReading <= 999999999 &&
+      data.lastAlertThreshold is number && data.lastAlertThreshold >= 0 && data.lastAlertThreshold <= 200 &&
+      data.lastAlertSentAt is string && data.lastAlertSentAt.size() <= 40 &&
+      data.isActive is bool &&
+      data.isArchived is bool &&
+      data.createdAt is timestamp &&
+      data.updatedAt is timestamp;
+    }
+
+    function isValidMonthlyRecord(data, userId, meterId, monthId) {
+      return data.keys().hasAll([
+        'monthId', 'meterId', 'userId', 'meterName', 'meterNumber',
+        'openingReading', 'currentReading', 'closingReading', 'unitsConsumed',
+        'monthlyLimitSnapshot', 'estimatedRateSnapshot', 'fixedChargesSnapshot',
+        'estimatedCost', 'status', 'readingsCount', 'createdAt', 'updatedAt'
+      ]) &&
+      data.keys().hasOnly([
+        'monthId', 'meterId', 'userId', 'meterName', 'meterNumber',
+        'openingReading', 'currentReading', 'closingReading', 'unitsConsumed',
+        'monthlyLimitSnapshot', 'estimatedRateSnapshot', 'fixedChargesSnapshot',
+        'estimatedCost', 'status', 'readingsCount', 'createdAt', 'updatedAt'
+      ]) &&
+      data.monthId is string && data.monthId.size() == 7 &&
+      data.monthId.matches('^[0-9]{4}-[0-9]{2}$') && data.monthId == monthId &&
+      data.meterId is string && data.meterId.size() >= 1 && data.meterId.size() <= 128 &&
+      data.meterId.matches('^[a-zA-Z0-9_\\-]+$') && data.meterId == meterId &&
+      data.userId is string && data.userId.size() >= 1 && data.userId.size() <= 128 &&
+      data.userId.matches('^[a-zA-Z0-9_\\-]+$') && data.userId == userId && data.userId == request.auth.uid &&
+      data.meterName is string && data.meterName.size() >= 1 && data.meterName.size() <= 80 &&
+      data.meterNumber is string && data.meterNumber.size() >= 1 && data.meterNumber.size() <= 60 &&
+      data.openingReading is number && data.openingReading >= 0 && data.openingReading <= 999999999 &&
+      data.currentReading is number && data.currentReading >= 0 && data.currentReading <= 999999999 &&
+      data.closingReading is number && data.closingReading >= 0 && data.closingReading <= 999999999 &&
+      data.unitsConsumed is number && data.unitsConsumed >= 0 && data.unitsConsumed <= 999999999 &&
+      data.monthlyLimitSnapshot is number && data.monthlyLimitSnapshot >= 1 && data.monthlyLimitSnapshot <= 1000000 &&
+      data.estimatedRateSnapshot is number && data.estimatedRateSnapshot >= 0 && data.estimatedRateSnapshot <= 100000 &&
+      data.fixedChargesSnapshot is number && data.fixedChargesSnapshot >= 0 && data.fixedChargesSnapshot <= 1000000 &&
+      data.estimatedCost is number && data.estimatedCost >= 0 && data.estimatedCost <= 999999999 &&
+      data.status is string && data.status.size() >= 1 && data.status.size() <= 20 &&
+      data.status in ['active', 'finalized'] &&
+      data.readingsCount is number && data.readingsCount >= 0 && data.readingsCount <= 10000 &&
+      data.createdAt is timestamp &&
+      data.updatedAt is timestamp;
+    }
+
+    function isValidMeterReading(data, userId, meterId, monthId, readingId) {
+      return data.keys().hasAll([
+        'readingId', 'meterId', 'monthId', 'userId', 'readingValue',
+        'previousReadingValue', 'unitsSincePreviousReading', 'totalMonthUnits',
+        'readingDate', 'note', 'isRolloverOrCorrection', 'createdAt', 'updatedAt'
+      ]) &&
+      data.keys().hasOnly([
+        'readingId', 'meterId', 'monthId', 'userId', 'readingValue',
+        'previousReadingValue', 'unitsSincePreviousReading', 'totalMonthUnits',
+        'readingDate', 'note', 'isRolloverOrCorrection', 'createdAt', 'updatedAt'
+      ]) &&
+      data.readingId is string && data.readingId.size() >= 1 && data.readingId.size() <= 128 &&
+      data.readingId.matches('^[a-zA-Z0-9_\\-]+$') && data.readingId == readingId &&
+      data.meterId is string && data.meterId.size() >= 1 && data.meterId.size() <= 128 &&
+      data.meterId.matches('^[a-zA-Z0-9_\\-]+$') && data.meterId == meterId &&
+      data.monthId is string && data.monthId.size() == 7 &&
+      data.monthId.matches('^[0-9]{4}-[0-9]{2}$') && data.monthId == monthId &&
+      data.userId is string && data.userId.size() >= 1 && data.userId.size() <= 128 &&
+      data.userId.matches('^[a-zA-Z0-9_\\-]+$') && data.userId == userId && data.userId == request.auth.uid &&
+      data.readingValue is number && data.readingValue >= 0 && data.readingValue <= 999999999 &&
+      data.previousReadingValue is number && data.previousReadingValue >= 0 && data.previousReadingValue <= 999999999 &&
+      data.unitsSincePreviousReading is number && data.unitsSincePreviousReading >= 0 && data.unitsSincePreviousReading <= 999999999 &&
+      data.totalMonthUnits is number && data.totalMonthUnits >= 0 && data.totalMonthUnits <= 999999999 &&
+      data.readingDate is string && data.readingDate.size() >= 10 && data.readingDate.size() <= 30 &&
+      data.note is string && data.note.size() <= 200 &&
+      data.isRolloverOrCorrection is bool &&
+      data.createdAt is timestamp &&
+      data.updatedAt is timestamp;
+    }
+
+    function isValidAppNotification(data, userId, notificationId) {
+      return data.keys().hasAll([
+        'notificationId', 'userId', 'meterId', 'meterName', 'monthId',
+        'type', 'category', 'title', 'message', 'threshold',
+        'isRead', 'deliveryChannel', 'createdAt', 'updatedAt'
+      ]) &&
+      data.keys().hasOnly([
+        'notificationId', 'userId', 'meterId', 'meterName', 'monthId',
+        'type', 'category', 'title', 'message', 'threshold',
+        'isRead', 'deliveryChannel', 'createdAt', 'updatedAt'
+      ]) &&
+      data.notificationId is string && data.notificationId.size() >= 1 && data.notificationId.size() <= 128 &&
+      data.notificationId.matches('^[a-zA-Z0-9_\\-]+$') && data.notificationId == notificationId &&
+      data.userId is string && data.userId.size() >= 1 && data.userId.size() <= 128 &&
+      data.userId.matches('^[a-zA-Z0-9_\\-]+$') && data.userId == userId && data.userId == request.auth.uid &&
+      data.meterId is string && data.meterId.size() >= 1 && data.meterId.size() <= 128 &&
+      data.meterId.matches('^[a-zA-Z0-9_\\-]+$') &&
+      data.meterName is string && data.meterName.size() >= 1 && data.meterName.size() <= 80 &&
+      data.monthId is string && data.monthId.size() == 7 &&
+      data.monthId.matches('^[0-9]{4}-[0-9]{2}$') &&
+      data.type is string && data.type.size() >= 1 && data.type.size() <= 30 &&
+      data.type in [
+        'usage_update', 'warning', 'strong_warning', 'high_alert',
+        'critical', 'limit_reached', 'limit_exceeded', 'reminder',
+        'month_started', 'meter_added', 'report_ready'
+      ] &&
+      data.category is string && data.category.size() >= 1 && data.category.size() <= 20 &&
+      data.category in ['alert', 'reminder', 'system'] &&
+      data.title is string && data.title.size() >= 1 && data.title.size() <= 120 &&
+      data.message is string && data.message.size() >= 1 && data.message.size() <= 400 &&
+      data.threshold is number && data.threshold >= 0 && data.threshold <= 200 &&
+      data.isRead is bool &&
+      data.deliveryChannel is string && data.deliveryChannel.size() >= 1 && data.deliveryChannel.size() <= 60 &&
+      data.createdAt is timestamp &&
+      data.updatedAt is timestamp;
+    }
+
+    function isValidAuditLog(data, userId, logId) {
+      return data.keys().hasAll([
+        'logId', 'userId', 'meterId', 'monthId', 'action',
+        'previousValue', 'newValue', 'reason', 'createdAt'
+      ]) &&
+      data.keys().hasOnly([
+        'logId', 'userId', 'meterId', 'monthId', 'action',
+        'previousValue', 'newValue', 'reason', 'createdAt'
+      ]) &&
+      data.logId is string && data.logId.size() >= 1 && data.logId.size() <= 128 &&
+      data.logId.matches('^[a-zA-Z0-9_\\-]+$') && data.logId == logId &&
+      data.userId is string && data.userId.size() >= 1 && data.userId.size() <= 128 &&
+      data.userId.matches('^[a-zA-Z0-9_\\-]+$') && data.userId == userId && data.userId == request.auth.uid &&
+      data.meterId is string && data.meterId.size() >= 1 && data.meterId.size() <= 128 &&
+      data.meterId.matches('^[a-zA-Z0-9_\\-]+$') &&
+      data.monthId is string && data.monthId.size() == 7 &&
+      data.monthId.matches('^[0-9]{4}-[0-9]{2}$') &&
+      data.action is string && data.action.size() >= 1 && data.action.size() <= 80 &&
+      data.previousValue is string && data.previousValue.size() <= 300 &&
+      data.newValue is string && data.newValue.size() <= 300 &&
+      data.reason is string && data.reason.size() <= 300 &&
+      data.createdAt is timestamp;
+    }
+
+    // ============================================================================
+    // Collection Rules
+    // ============================================================================
+
+    // 1. User Profile (/users/{userId})
+    match /users/{userId} {
+      allow get: if isOwner(userId) && isValidId(userId) && existing().userId == request.auth.uid;
+      allow list: if false;
+
+      allow create: if isOwner(userId) &&
+        isValidId(userId) &&
+        isValidUserProfile(incoming(), userId) &&
+        incoming().createdAt == request.time &&
+        incoming().updatedAt == request.time;
+
+      allow update: if isOwner(userId) &&
+        isValidId(userId) &&
+        isValidUserProfile(incoming(), userId) &&
+        incoming().userId == existing().userId &&
+        incoming().createdAt == existing().createdAt &&
+        incoming().updatedAt == request.time &&
+        (
+          // Action: Update Profile & Notification Settings
+          incoming().diff(existing()).affectedKeys().hasOnly([
+            'name', 'email', 'currency', 'timezone',
+            'inAppNotifications', 'browserPushNotifications', 'emailNotifications',
+            'quietHoursStart', 'quietHoursEnd', 'readingReminderDays',
+            'setupCompleted', 'updatedAt'
+          ])
+        );
+
+      allow delete: if false;
+
+      // 2. Electricity Meters (/users/{userId}/meters/{meterId})
+      match /meters/{meterId} {
+        allow get: if isOwner(userId) &&
+          isValidId(userId) &&
+          isValidId(meterId) &&
+          existing().userId == request.auth.uid &&
+          userExists(userId);
+
+        allow list: if isOwner(userId) &&
+          existing().userId == request.auth.uid;
+
+        allow create: if isOwner(userId) &&
+          isValidId(userId) &&
+          isValidId(meterId) &&
+          isValidElectricityMeter(incoming(), userId, meterId) &&
+          incoming().createdAt == request.time &&
+          incoming().updatedAt == request.time &&
+          userExists(userId);
+
+        allow update: if isOwner(userId) &&
+          isValidId(userId) &&
+          isValidId(meterId) &&
+          isValidElectricityMeter(incoming(), userId, meterId) &&
+          incoming().meterId == existing().meterId &&
+          incoming().userId == existing().userId &&
+          incoming().createdAt == existing().createdAt &&
+          incoming().updatedAt == request.time &&
+          userExists(userId) &&
+          (
+            // Action 1: Record Reading / Update Consumption / Start New Month
+            incoming().diff(existing()).affectedKeys().hasOnly([
+              'currentMonthId', 'openingReading', 'previousReading', 'previousReadingDate',
+              'currentReading', 'lastReadingDate', 'unitsConsumed', 'lastClosingReading',
+              'lastAlertThreshold', 'lastAlertSentAt', 'updatedAt'
+            ]) ||
+            // Action 2: Edit Meter Configuration, Limits, Bill Estimator Rates, or Archive Status
+            incoming().diff(existing()).affectedKeys().hasOnly([
+              'meterName', 'meterNumber', 'location', 'provider', 'iconType',
+              'monthlyLimit', 'estimatedRate', 'fixedCharges', 'additionalCharges',
+              'taxPercentage', 'isActive', 'isArchived', 'lastAlertThreshold',
+              'lastAlertSentAt', 'updatedAt'
+            ])
+          );
+
+        allow delete: if isOwner(userId) &&
+          isValidId(userId) &&
+          isValidId(meterId) &&
+          existing().userId == request.auth.uid &&
+          userExists(userId);
+
+        // 3. Monthly Records (/users/{userId}/meters/{meterId}/months/{monthId})
+        match /months/{monthId} {
+          allow get: if isOwner(userId) &&
+            isValidId(userId) &&
+            isValidId(meterId) &&
+            isValidMonthId(monthId) &&
+            existing().userId == request.auth.uid &&
+            meterExists(userId, meterId);
+
+          allow list: if isOwner(userId) &&
+            existing().userId == request.auth.uid;
+
+          allow create: if isOwner(userId) &&
+            isValidId(userId) &&
+            isValidId(meterId) &&
+            isValidMonthId(monthId) &&
+            isValidMonthlyRecord(incoming(), userId, meterId, monthId) &&
+            incoming().createdAt == request.time &&
+            incoming().updatedAt == request.time &&
+            meterExists(userId, meterId);
+
+          allow update: if isOwner(userId) &&
+            isValidId(userId) &&
+            isValidId(meterId) &&
+            isValidMonthId(monthId) &&
+            isValidMonthlyRecord(incoming(), userId, meterId, monthId) &&
+            incoming().monthId == existing().monthId &&
+            incoming().meterId == existing().meterId &&
+            incoming().userId == existing().userId &&
+            incoming().createdAt == existing().createdAt &&
+            incoming().updatedAt == request.time &&
+            meterExists(userId, meterId) &&
+            (
+              // Action 1: Update Active Month Readings, Limits, or Finalize Month
+              (existing().status == 'active' &&
+                incoming().diff(existing()).affectedKeys().hasOnly([
+                  'meterName', 'meterNumber', 'openingReading', 'currentReading',
+                  'closingReading', 'unitsConsumed', 'monthlyLimitSnapshot',
+                  'estimatedRateSnapshot', 'fixedChargesSnapshot', 'estimatedCost',
+                  'status', 'readingsCount', 'updatedAt'
+                ]))
+            );
+
+          allow delete: if false;
+
+          // 4. Meter Readings (/users/{userId}/meters/{meterId}/months/{monthId}/readings/{readingId})
+          match /readings/{readingId} {
+            allow get: if isOwner(userId) &&
+              isValidId(userId) &&
+              isValidId(meterId) &&
+              isValidMonthId(monthId) &&
+              isValidId(readingId) &&
+              existing().userId == request.auth.uid &&
+              monthExists(userId, meterId, monthId);
+
+            allow list: if isOwner(userId) &&
+              existing().userId == request.auth.uid;
+
+            allow create: if isOwner(userId) &&
+              isValidId(userId) &&
+              isValidId(meterId) &&
+              isValidMonthId(monthId) &&
+              isValidId(readingId) &&
+              isValidMeterReading(incoming(), userId, meterId, monthId, readingId) &&
+              incoming().createdAt == request.time &&
+              incoming().updatedAt == request.time &&
+              monthExists(userId, meterId, monthId);
+
+            allow update: if isOwner(userId) &&
+              isValidId(userId) &&
+              isValidId(meterId) &&
+              isValidMonthId(monthId) &&
+              isValidId(readingId) &&
+              isValidMeterReading(incoming(), userId, meterId, monthId, readingId) &&
+              incoming().readingId == existing().readingId &&
+              incoming().meterId == existing().meterId &&
+              incoming().monthId == existing().monthId &&
+              incoming().userId == existing().userId &&
+              incoming().createdAt == existing().createdAt &&
+              incoming().updatedAt == request.time &&
+              monthExists(userId, meterId, monthId) &&
+              (
+                // Action: Correct Reading Entry
+                incoming().diff(existing()).affectedKeys().hasOnly([
+                  'readingValue', 'previousReadingValue', 'unitsSincePreviousReading',
+                  'totalMonthUnits', 'readingDate', 'note', 'isRolloverOrCorrection', 'updatedAt'
+                ])
+              );
+
+            allow delete: if false;
+          }
+        }
+      }
+
+      // 5. Notifications (/users/{userId}/notifications/{notificationId})
+      match /notifications/{notificationId} {
+        allow get: if isOwner(userId) &&
+          isValidId(userId) &&
+          isValidId(notificationId) &&
+          existing().userId == request.auth.uid &&
+          userExists(userId);
+
+        allow list: if isOwner(userId) &&
+          existing().userId == request.auth.uid;
+
+        allow create: if isOwner(userId) &&
+          isValidId(userId) &&
+          isValidId(notificationId) &&
+          isValidAppNotification(incoming(), userId, notificationId) &&
+          incoming().createdAt == request.time &&
+          incoming().updatedAt == request.time &&
+          userExists(userId);
+
+        allow update: if isOwner(userId) &&
+          isValidId(userId) &&
+          isValidId(notificationId) &&
+          isValidAppNotification(incoming(), userId, notificationId) &&
+          incoming().notificationId == existing().notificationId &&
+          incoming().userId == existing().userId &&
+          incoming().meterId == existing().meterId &&
+          incoming().createdAt == existing().createdAt &&
+          incoming().updatedAt == request.time &&
+          userExists(userId) &&
+          (
+            // Action: Mark Read / Unread
+            incoming().diff(existing()).affectedKeys().hasOnly(['isRead', 'updatedAt'])
+          );
+
+        allow delete: if isOwner(userId) &&
+          isValidId(userId) &&
+          isValidId(notificationId) &&
+          existing().userId == request.auth.uid &&
+          userExists(userId);
+      }
+
+      // 6. Audit Logs (/users/{userId}/auditLogs/{logId})
+      match /auditLogs/{logId} {
+        allow get: if isOwner(userId) &&
+          isValidId(userId) &&
+          isValidId(logId) &&
+          existing().userId == request.auth.uid &&
+          userExists(userId);
+
+        allow list: if isOwner(userId) &&
+          existing().userId == request.auth.uid;
+
+        allow create: if isOwner(userId) &&
+          isValidId(userId) &&
+          isValidId(logId) &&
+          isValidAuditLog(incoming(), userId, logId) &&
+          incoming().createdAt == request.time &&
+          userExists(userId);
+
+        allow update, delete: if false;
+      }
+    }
+  }
+}

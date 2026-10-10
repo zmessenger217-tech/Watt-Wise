@@ -1,0 +1,6 @@
+{
+  "name": "WattWise — Electricity Unit & Bill Manager",
+  "description": "Smart electricity consumption monitor, multi-meter manager, monthly unit limit tracker, and bill estimator with device notifications.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
