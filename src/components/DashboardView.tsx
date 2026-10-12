@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   FileText,
   Zap,
@@ -9,6 +9,8 @@ import {
   Plus,
   MoreVertical,
   Calendar,
+  Activity,
+  Clock,
 } from 'lucide-react';
 import {
   ResponsiveContainer,
@@ -33,6 +35,10 @@ import {
   calculateEstimatedBill,
   analyzeConsumptionThreshold,
   formatMonthLabel,
+  calculateDailyStats,
+  getCurrentMonthId,
+  getTimeOfDayGreeting,
+  formatLiveDateTime,
 } from '../utils/calculations';
 
 const PIE_COLORS = ['#1D63ED', '#0EA5E9', '#16A34A', '#F59E0B', '#8B5CF6'];
@@ -48,6 +54,20 @@ export const DashboardView: React.FC = () => {
     setEditingMeter,
   } = useWattWise();
 
+  // Real-time ticking clock state updated every second
+  const [now, setNow] = useState<Date>(() => new Date());
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setNow(new Date());
+    }, 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  const currentRealMonthId = useMemo(() => getCurrentMonthId(now), [now]);
+  const liveClock = useMemo(() => formatLiveDateTime(now), [now]);
+  const greeting = useMemo(() => getTimeOfDayGreeting(now), [now]);
+
   const activeMeters = useMemo(
     () => meters.filter((m) => m.isActive && !m.isArchived),
     [meters]
@@ -55,37 +75,54 @@ export const DashboardView: React.FC = () => {
 
   const availableMonths = useMemo(() => {
     const set = new Set<string>();
+    set.add(currentRealMonthId);
     meters.forEach((m) => set.add(m.currentMonthId));
     months.forEach((mo) => set.add(mo.monthId));
     return Array.from(set).sort((a, b) => b.localeCompare(a));
-  }, [meters, months]);
+  }, [meters, months, currentRealMonthId]);
 
   const [selectedMonth, setSelectedMonth] = useState<string>(
-    availableMonths[0] || '2026-10'
+    () => activeMeters[0]?.currentMonthId || availableMonths[0] || getCurrentMonthId()
   );
   const [chartTab, setChartTab] = useState<'daily' | 'monthly' | 'limit'>('daily');
 
+  // Keep selectedMonth aligned with active meters when data loads from Firebase
+  useEffect(() => {
+    if (activeMeters.length > 0) {
+      const hasMeterInSelected = activeMeters.some((m) => m.currentMonthId === selectedMonth);
+      const hasMonthRecordInSelected = months.some((mo) => mo.monthId === selectedMonth);
+      if (!hasMeterInSelected && !hasMonthRecordInSelected) {
+        setSelectedMonth(activeMeters[0].currentMonthId);
+      }
+    }
+  }, [activeMeters, months, selectedMonth]);
+
   const currency = userProfile?.currency || 'PKR';
 
-  // Aggregate summary stats across active meters
+  // Aggregate summary stats & Daily Usage Average across all active meters together
   const summaryStats = useMemo(() => {
-    let totalUnits = 0;
-    let totalRemaining = 0;
+    let totalUnitsExact = 0;
+    let totalRemainingExact = 0;
+    let totalLimitExact = 0;
     let nearLimitCount = 0;
     let totalCost = 0;
+    let allFinalized = activeMeters.length > 0;
 
     activeMeters.forEach((meter) => {
       const monthRec = months.find(
         (mo) => mo.meterId === meter.meterId && mo.monthId === selectedMonth
       );
-      const consumed =
-        selectedMonth === meter.currentMonthId
-          ? meter.unitsConsumed
-          : monthRec?.unitsConsumed ?? 0;
-      const limit =
-        selectedMonth === meter.currentMonthId
-          ? meter.monthlyLimit
-          : monthRec?.monthlyLimitSnapshot ?? meter.monthlyLimit;
+      const isCurrentActiveMonth = selectedMonth === meter.currentMonthId;
+      if (isCurrentActiveMonth || monthRec?.status !== 'finalized') {
+        allFinalized = false;
+      }
+
+      const consumed = isCurrentActiveMonth
+        ? meter.unitsConsumed
+        : monthRec?.unitsConsumed ?? 0;
+      const limit = isCurrentActiveMonth
+        ? meter.monthlyLimit
+        : monthRec?.monthlyLimitSnapshot ?? meter.monthlyLimit;
 
       const remaining = calculateRemainingUnits(consumed, limit);
       const pct = calculateUsagePercentage(consumed, limit);
@@ -97,20 +134,42 @@ export const DashboardView: React.FC = () => {
         meter.taxPercentage
       );
 
-      totalUnits += consumed;
-      totalRemaining += remaining;
+      totalUnitsExact += consumed;
+      totalRemainingExact += remaining;
+      totalLimitExact += limit;
       if (pct >= 75) nearLimitCount += 1;
       totalCost += bill.totalEstimatedBill;
     });
 
+    const combinedDaily = calculateDailyStats(
+      totalUnitsExact,
+      totalLimitExact,
+      selectedMonth,
+      now.toISOString(),
+      allFinalized
+    );
+
+    const perMeterDailyAverage =
+      activeMeters.length > 0
+        ? Math.round((combinedDaily.dailyAverage / activeMeters.length) * 100) / 100
+        : 0;
+
     return {
       totalMeters: activeMeters.length,
-      totalUnits: Math.round(totalUnits),
-      totalRemaining: Math.round(totalRemaining),
+      totalUnits: Math.round(totalUnitsExact * 100) / 100,
+      totalRemaining: Math.round(totalRemainingExact * 100) / 100,
+      totalLimit: Math.round(totalLimitExact),
       nearLimitCount,
       totalCost: Math.round(totalCost),
+      combinedDailyAverage: combinedDaily.dailyAverage,
+      combinedDailyAllowance: combinedDaily.dailyLimitAllowance,
+      perMeterDailyAverage,
+      daysElapsed: combinedDaily.daysElapsed,
+      daysInMonth: combinedDaily.daysInMonth,
+      projectedMonthlyUnits: combinedDaily.projectedMonthlyUnits,
+      estimatedDaysRemainingBeforeLimit: combinedDaily.estimatedDaysRemainingBeforeLimit,
     };
-  }, [activeMeters, months, selectedMonth]);
+  }, [activeMeters, months, selectedMonth, now]);
 
   // Real reading data for Daily Consumption Trend chart
   const dailyTrendData = useMemo(() => {
@@ -203,14 +262,23 @@ export const DashboardView: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      {/* Greeting & Month Filter Header */}
+      {/* Greeting, Real-Time Clock & Month Filter Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900 tracking-tight">
-            Good evening, {userProfile?.name || 'User'}!
-          </h1>
+          <div className="flex flex-wrap items-center gap-2.5">
+            <h1 className="text-2xl font-bold text-slate-900 tracking-tight">
+              {greeting}, {userProfile?.name || 'User'}!
+            </h1>
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-emerald-50 border border-emerald-200/80 text-[11px] font-semibold text-emerald-700 tabular-nums">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+              <Clock className="w-3 h-3" />
+              <span>
+                {liveClock.dayName}, {liveClock.dateFormatted} · {liveClock.timeFormatted}
+              </span>
+            </span>
+          </div>
           <p className="text-sm text-slate-500 mt-0.5">
-            Here is your electricity usage overview.
+            Real-time electricity usage overview and combined daily average across all meters.
           </p>
         </div>
 
@@ -245,8 +313,8 @@ export const DashboardView: React.FC = () => {
         </div>
       </div>
 
-      {/* 5 Top Summary Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+      {/* 6 Top Summary KPI Cards (Including Combined Daily Usage Average of All Meters) */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
         <div className="bg-white rounded-xl border border-slate-200/90 p-4 flex items-center gap-3.5 shadow-2xs">
           <div className="w-11 h-11 rounded-full bg-[#1D63ED] text-white flex items-center justify-center shrink-0">
             <FileText className="w-5 h-5" />
@@ -267,6 +335,25 @@ export const DashboardView: React.FC = () => {
             <div className="text-xs font-medium text-slate-500 truncate">Units Consumed</div>
             <div className="text-2xl font-extrabold text-slate-900 tabular-nums">
               {summaryStats.totalUnits.toLocaleString()}
+            </div>
+          </div>
+        </div>
+
+        {/* Daily Usage Average of All Meters Together */}
+        <div className="bg-white rounded-xl border border-blue-200/90 p-4 flex items-center gap-3.5 shadow-2xs">
+          <div className="w-11 h-11 rounded-full bg-blue-50 text-[#1D63ED] flex items-center justify-center shrink-0">
+            <Activity className="w-5 h-5" />
+          </div>
+          <div className="min-w-0">
+            <div className="text-xs font-medium text-slate-500 truncate">
+              Daily Avg (All Meters)
+            </div>
+            <div className="text-xl font-extrabold text-[#1D63ED] tabular-nums truncate">
+              {summaryStats.combinedDailyAverage.toLocaleString()}{' '}
+              <span className="text-xs font-semibold text-slate-500">u/day</span>
+            </div>
+            <div className="text-[10px] text-slate-400 truncate">
+              Day {summaryStats.daysElapsed} of {summaryStats.daysInMonth}
             </div>
           </div>
         </div>
@@ -303,6 +390,55 @@ export const DashboardView: React.FC = () => {
             <div className="text-xs font-medium text-slate-500 truncate">Est. Monthly Cost</div>
             <div className="text-lg font-extrabold text-slate-900 tabular-nums truncate">
               {currency} {summaryStats.totalCost.toLocaleString()}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Combined Daily Usage Average Breakdown Banner (All Meters Together) */}
+      <div className="bg-white rounded-xl border border-slate-200/90 p-4 sm:p-5 shadow-2xs">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div className="flex items-start sm:items-center gap-3.5">
+            <div className="w-10 h-10 rounded-xl bg-blue-50 border border-blue-200 text-[#1D63ED] flex items-center justify-center shrink-0">
+              <Activity className="w-5 h-5" />
+            </div>
+            <div>
+              <h2 className="text-sm font-bold text-slate-900">
+                Combined Daily Usage Average (All {summaryStats.totalMeters}{' '}
+                {summaryStats.totalMeters === 1 ? 'Meter' : 'Meters'} Together)
+              </h2>
+              <p className="text-xs text-slate-500 mt-0.5">
+                Calculated in real time from {summaryStats.totalUnits.toLocaleString()} total units consumed over{' '}
+                {summaryStats.daysElapsed} elapsed {summaryStats.daysElapsed === 1 ? 'day' : 'days'} in{' '}
+                {formatMonthLabel(selectedMonth)}.
+              </p>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-5 pt-3 md:pt-0 border-t md:border-t-0 border-slate-100">
+            <div>
+              <div className="text-[11px] font-medium text-slate-500">All Meters Daily Avg</div>
+              <div className="text-base font-extrabold text-[#1D63ED] tabular-nums">
+                {summaryStats.combinedDailyAverage.toLocaleString()} u/day
+              </div>
+            </div>
+            <div>
+              <div className="text-[11px] font-medium text-slate-500">Avg Per Meter</div>
+              <div className="text-base font-extrabold text-slate-900 tabular-nums">
+                {summaryStats.perMeterDailyAverage.toLocaleString()} u/day
+              </div>
+            </div>
+            <div>
+              <div className="text-[11px] font-medium text-slate-500">Safe Daily Budget</div>
+              <div className="text-base font-extrabold text-emerald-600 tabular-nums">
+                {summaryStats.combinedDailyAllowance.toLocaleString()} u/day
+              </div>
+            </div>
+            <div>
+              <div className="text-[11px] font-medium text-slate-500">Projected Monthly</div>
+              <div className="text-base font-extrabold text-slate-900 tabular-nums">
+                {summaryStats.projectedMonthlyUnits.toLocaleString()} units
+              </div>
             </div>
           </div>
         </div>
@@ -555,6 +691,13 @@ export const DashboardView: React.FC = () => {
             {activeMeters.map((meter) => {
               const pct = calculateUsagePercentage(meter.unitsConsumed, meter.monthlyLimit);
               const thresholdInfo = analyzeConsumptionThreshold(pct);
+              const meterDaily = calculateDailyStats(
+                meter.unitsConsumed,
+                meter.monthlyLimit,
+                meter.currentMonthId,
+                now.toISOString(),
+                false
+              );
 
               return (
                 <div
@@ -610,7 +753,13 @@ export const DashboardView: React.FC = () => {
 
                       <div className="flex items-center justify-between text-[11px] text-slate-500 mt-2.5">
                         <span>Last reading: {meter.lastReadingDate}</span>
-                        <span className="font-mono">
+                        <span className="font-semibold text-[#1D63ED] tabular-nums">
+                          Avg: {meterDaily.dailyAverage.toLocaleString()} u/day
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between text-[11px] text-slate-400 mt-1">
+                        <span>Open: {meter.openingReading.toLocaleString()}</span>
+                        <span className="font-mono text-slate-600">
                           Curr: {meter.currentReading.toLocaleString()}
                         </span>
                       </div>

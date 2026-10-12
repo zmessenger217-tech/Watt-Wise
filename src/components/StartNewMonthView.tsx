@@ -9,7 +9,7 @@ import {
 } from 'lucide-react';
 import { useWattWise } from '../context/WattWiseContext';
 import { MeterIconBadge } from './MeterIconBadge';
-import { getNextMonthId, formatMonthLabel } from '../utils/calculations';
+import { getNextMonthId, formatMonthLabel, getCurrentMonthId } from '../utils/calculations';
 
 export const StartNewMonthView: React.FC = () => {
   const { meters, startNewMonth, setActivePage } = useWattWise();
@@ -20,7 +20,7 @@ export const StartNewMonthView: React.FC = () => {
   );
 
   const defaultNextMonth = useMemo(() => {
-    const base = activeMeters[0]?.currentMonthId || '2026-10';
+    const base = activeMeters[0]?.currentMonthId || getCurrentMonthId();
     return getNextMonthId(base);
   }, [activeMeters]);
 

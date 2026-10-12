@@ -14,6 +14,7 @@ import {
   validateReadingEntry,
   analyzeConsumptionThreshold,
   calculateDailyStats,
+  getTodayDateString,
 } from '../utils/calculations';
 import { MeterReading } from '../types';
 
@@ -37,7 +38,7 @@ export const EnterReadingView: React.FC = () => {
     );
   }, [activeMeters, selectedMeterId]);
 
-  const [readingDate, setReadingDate] = useState('2026-10-09');
+  const [readingDate, setReadingDate] = useState(() => getTodayDateString());
   const [readingInput, setReadingInput] = useState('');
   const [note, setNote] = useState('');
   const [isRolloverOrCorrection, setIsRolloverOrCorrection] = useState(false);

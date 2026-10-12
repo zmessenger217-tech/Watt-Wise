@@ -280,11 +280,49 @@ export function calculateEstimatedBill(
   };
 }
 
+export function getTodayDateString(now: Date = new Date()): string {
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, '0');
+  const day = String(now.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+export function getCurrentMonthId(now: Date = new Date()): string {
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, '0');
+  return `${year}-${month}`;
+}
+
+export function getTimeOfDayGreeting(now: Date = new Date()): string {
+  const hour = now.getHours();
+  if (hour < 12) return 'Good morning';
+  if (hour < 17) return 'Good afternoon';
+  return 'Good evening';
+}
+
+export function formatLiveDateTime(now: Date = new Date()): {
+  dateFormatted: string;
+  timeFormatted: string;
+  dayName: string;
+} {
+  const dateFormatted = now.toLocaleDateString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+  });
+  const timeFormatted = now.toLocaleTimeString('en-US', {
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+  });
+  const dayName = now.toLocaleDateString('en-US', { weekday: 'short' });
+  return { dateFormatted, timeFormatted, dayName };
+}
+
 export function getNextMonthId(currentMonthId: string): string {
   const match = /^(\d{4})-(\d{2})$/.exec(currentMonthId);
   if (!match) {
-    const now = new Date();
-    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+    return getCurrentMonthId();
   }
   let year = parseInt(match[1], 10);
   let month = parseInt(match[2], 10);
@@ -310,28 +348,35 @@ export function calculateDailyStats(
   unitsConsumed: number,
   monthlyLimit: number,
   monthId: string,
-  referenceDateStr?: string
+  referenceDateStr?: string,
+  isHistoricalFinalized: boolean = false
 ): {
   daysElapsed: number;
   daysInMonth: number;
   dailyAverage: number;
+  dailyLimitAllowance: number;
   estimatedDaysRemainingBeforeLimit: number | null;
   projectedMonthlyUnits: number;
 } {
   const match = /^(\d{4})-(\d{2})$/.exec(monthId);
   const now = referenceDateStr ? new Date(referenceDateStr) : new Date();
-  const year = match ? parseInt(match[1], 10) : now.getFullYear();
-  const month = match ? parseInt(match[2], 10) : now.getMonth() + 1;
+  const validNow = Number.isNaN(now.getTime()) ? new Date() : now;
+  const year = match ? parseInt(match[1], 10) : validNow.getFullYear();
+  const month = match ? parseInt(match[2], 10) : validNow.getMonth() + 1;
   const daysInMonth = new Date(year, month, 0).getDate();
 
-  let daysElapsed = now.getDate();
-  if (Number.isNaN(daysElapsed) || daysElapsed < 1) {
-    daysElapsed = 9;
+  let daysElapsed = validNow.getDate();
+  if (isHistoricalFinalized) {
+    daysElapsed = daysInMonth;
+  } else if (Number.isNaN(daysElapsed) || daysElapsed < 1) {
+    daysElapsed = 1;
   }
-  daysElapsed = Math.min(daysElapsed, daysInMonth);
+  daysElapsed = Math.max(1, Math.min(daysElapsed, daysInMonth));
 
   const dailyAverage =
-    daysElapsed > 0 ? Math.round((unitsConsumed / daysElapsed) * 10) / 10 : 0;
+    daysElapsed > 0 ? Math.round((unitsConsumed / daysElapsed) * 100) / 100 : 0;
+  const dailyLimitAllowance =
+    daysInMonth > 0 ? Math.round((monthlyLimit / daysInMonth) * 100) / 100 : 0;
   const remainingUnits = Math.max(0, monthlyLimit - unitsConsumed);
   const estimatedDaysRemainingBeforeLimit =
     dailyAverage > 0 ? Math.max(0, Math.floor(remainingUnits / dailyAverage)) : null;
@@ -341,6 +386,7 @@ export function calculateDailyStats(
     daysElapsed,
     daysInMonth,
     dailyAverage,
+    dailyLimitAllowance,
     estimatedDaysRemainingBeforeLimit,
     projectedMonthlyUnits,
   };

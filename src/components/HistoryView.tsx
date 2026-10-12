@@ -6,6 +6,7 @@ import {
   calculateUsagePercentage,
   analyzeConsumptionThreshold,
   formatMonthLabel,
+  getCurrentMonthId,
 } from '../utils/calculations';
 import { downloadCsvFile } from '../utils/exportCsv';
 import { MonthlyRecord } from '../types';
@@ -21,13 +22,14 @@ export const HistoryView: React.FC = () => {
 
   const availableMonths = useMemo(() => {
     const set = new Set<string>();
+    set.add(getCurrentMonthId());
     months.forEach((mo) => set.add(mo.monthId));
     meters.forEach((m) => set.add(m.currentMonthId));
     return Array.from(set).sort((a, b) => b.localeCompare(a));
   }, [months, meters]);
 
   const [selectedMonth, setSelectedMonth] = useState<string>(
-    availableMonths[0] || '2026-10'
+    availableMonths[0] || getCurrentMonthId()
   );
   const [selectedMeterFilter, setSelectedMeterFilter] = useState<string>('all');
   const [editingRecord, setEditingRecord] = useState<MonthlyRecord | null>(null);

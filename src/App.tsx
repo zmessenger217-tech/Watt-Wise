@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Menu,
   Bell,
@@ -10,8 +10,10 @@ import {
   LogOut,
   User,
   Settings,
+  Clock,
 } from 'lucide-react';
 import { WattWiseProvider, useWattWise } from './context/WattWiseContext';
+import { formatLiveDateTime } from './utils/calculations';
 import { AuthScreen } from './components/AuthScreen';
 import { Sidebar } from './components/Sidebar';
 import { SetupWizardModal } from './components/SetupWizardModal';
@@ -46,6 +48,16 @@ const MainWorkspace: React.FC = () => {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
+  const [now, setNow] = useState<Date>(() => new Date());
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setNow(new Date());
+    }, 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  const liveClock = formatLiveDateTime(now);
 
   if (!isAuthReady) {
     return (
@@ -126,8 +138,20 @@ const MainWorkspace: React.FC = () => {
             </span>
           </div>
 
-          {/* Right Zone: PWA Install, Notification Bell & User Account Menu */}
+          {/* Right Zone: Real-Time Clock, PWA Install, Notification Bell & User Account Menu */}
           <div className="flex items-center gap-3 shrink-0">
+            <div className="hidden md:flex items-center gap-2 px-3 py-1.5 rounded-lg bg-slate-50 border border-slate-200/80 text-xs font-medium text-slate-600 tabular-nums">
+              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse shrink-0" />
+              <Clock className="w-3.5 h-3.5 text-[#1D63ED] shrink-0" />
+              <span className="font-semibold text-slate-800">
+                {liveClock.dayName}, {liveClock.dateFormatted}
+              </span>
+              <span className="text-slate-300">|</span>
+              <span className="font-mono font-bold text-[#1D63ED]">
+                {liveClock.timeFormatted}
+              </span>
+            </div>
+
             <PWAInstallButton />
 
             <button

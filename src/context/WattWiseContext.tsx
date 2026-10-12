@@ -47,6 +47,8 @@ import {
   shouldDispatchThresholdAlert,
   validateReadingEntry,
   formatMonthLabel,
+  getTodayDateString,
+  getCurrentMonthId,
 } from '../utils/calculations';
 import { createDefaultUserProfile, createEmptyDataset } from '../utils/sampleData';
 import {
@@ -1186,8 +1188,8 @@ export const WattWiseProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       if (!userProfile) throw new Error('User not authenticated');
 
       const meterId = sanitizeId(`meter-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`);
-      const todayStr = '2026-10-09';
-      const currentMonthId = '2026-10';
+      const todayStr = getTodayDateString();
+      const currentMonthId = getCurrentMonthId();
       const opening = Math.max(0, Number(input.initialReading) || 0);
       const limit = Math.max(1, Number(input.monthlyLimit) || 500);
       const rate = Math.max(0, Number(input.estimatedRate) || 35);
